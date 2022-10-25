@@ -1,37 +1,16 @@
 import networkit as nw
 from dwave_qbsolv import QBSolv
-import matplotlib.pyplot as plt
 import random
 from datetime import datetime
 import argparse
 import time
 import numpy as np
 import networkx as nx
-from qiskit import BasicAer
-from qiskit.algorithms import QAOA
-import qiskit.aqua.components.optimizers as optimizers
-from qiskit.algorithms.optimizers import L_BFGS_B
-from qiskit.algorithms.optimizers import COBYLA
-from QAOAKit.utils import (
-    precompute_energies,
-    maxcut_obj,
-    get_adjacency_matrix,
-    qaoa_maxcut_energy
-)
-from QAOAKit import (
-    beta_to_qaoa_format,
-    gamma_to_qaoa_format
-)
-from QAOAKit.parameter_optimization import get_median_pre_trained_kde
-from qiskit_optimization import QuadraticProgram
-from qiskit_optimization.algorithms import MinimumEigenOptimizer
-from functools import partial
-from QAOAKit.qaoa import get_maxcut_qaoa_circuit
-import operator
 import pyomo.environ as pyo
 import scipy
-
-median, kde = get_median_pre_trained_kde(3)
+from queue import Queue
+import faulthandler
+faulthandler.enable()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gname", type = str, default = "None", help = "graph file")
@@ -39,33 +18,52 @@ parser.add_argument("-method", type = str, default = "None", help = "ref method"
 parser.add_argument("-spsize", type = int, default = 20, help = "size of subproblems")
 parser.add_argument("-solver", type = str, default = "qbsolv", help = "qubo slver")
 parser.add_argument("-optimizer", type = str, default = "COBYLA", help = "qaoa optimizer")
-parser.add_argument("-p", type = int, default = 1, help = "p value of qaoa")
 parser.add_argument("-gformat", type = str, default = "alist", help = "graph format")
 parser.add_argument("-nomultilvl", type = bool, default = False, help = "Use/Dont Use Multilevel")
+parser.add_argument("-checktrivial", type = int, default = 0)
 
-#median, kde = get_median_pre_trained_kde(3)
 args = parser.parse_args()
+
+
 useml = args.nomultilvl
 method = args.method
 gname = args.gname
 spsize = args.spsize
 solver = args.solver
 optimizer = args.optimizer
-p = args.p
 gformat = args.gformat
+checktrivial = args.checktrivial
+trivialsp = 0
 
-mapGain = {}
-S = []
-T = []
-gainTime = 0
-pairTime = 0
-buildSpTime = 0
-solveTime = 0
-qSolves = 0
-cSolves = 0
-ties = 0
-minweight = 0
-qct = 0
+
+
+if solver == 'qaoa':
+    median, kde = get_median_pre_trained_kde(3)
+    from qiskit import BasicAer
+    from qiskit.algorithms import QAOA
+    import qiskit.aqua.components.optimizers as optimizers
+    from qiskit.algorithms.optimizers import L_BFGS_B
+    from qiskit.algorithms.optimizers import COBYLA
+    from QAOAKit.utils import (
+        precompute_energies,
+        maxcut_obj,
+        get_adjacency_matrix,
+        qaoa_maxcut_energy
+    )
+    from QAOAKit import (
+        beta_to_qaoa_format,
+        gamma_to_qaoa_format
+    )
+    from QAOAKit.parameter_optimization import get_median_pre_trained_kde
+    from qiskit_optimization import QuadraticProgram
+    from qiskit_optimization.algorithms import MinimumEigenOptimizer
+    from functools import partial
+    from QAOAKit.qaoa import get_maxcut_qaoa_circuit
+    import operator
+
+
+
+
 
 def readGraph():
     f = open(gname, "r")
@@ -120,9 +118,10 @@ def get_exact_energy(G, p):
 def pyomo(G, solver):
     if solver == "gurobi":
         opt = pyo.SolverFactory('gurobi')
-    elif solver == "cbc":
-        opt = pyo.SolverFactory('cbc')
-    opt.options['TimeLimit'] = 10
+        opt.options['TimeLimit'] = 5
+    elif solver == "ipopt":
+        opt = pyo.SolverFactory('ipopt')
+        opt.options['max_wall_time'] = 5
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
@@ -138,6 +137,10 @@ def pyomo(G, solver):
         solution[i] = model.x[i].value
         if solution[i] == None:
             solution[i] = 0
+        if solution[i] < 0.5:
+            solution[i] = 0
+        else:
+            solution[i] = 1
     return solution
 
 
@@ -159,7 +162,6 @@ def randSampleSolve(G):
 def build_qubo(G):
     Q = {}
     n = G.numberOfNodes()
-    print('average degree: ' + str(d_w))
     for i in range(n):
         for j in range(i,n):
             Q[(i,j)] = 0            
@@ -189,40 +191,16 @@ def calc_obj(G, solution):
     return -1 * obj
 
 
-def swapGain(G, sol, u, v):
+def nodeGain(G, sol, u):
     gain = 0
     for x in G.iterNeighbors(u):
-        if x != v:
-            if sol[x] == sol[u]:
-                gain += G.weight(u, x)
-            else:
-                gain -= G.weight(u, x)
-
-
-    for x in G.iterNeighbors(v):
-        if x != u:
-            if sol[x] == sol[v]:
-                gain += G.weight(v, x)
-            else:
-                gain -= G.weight(v, x)
+        if sol[x] == sol[u]:
+            gain += G.weight(u, x)
+        else:
+            gain -= G.weight(u, x)
     return gain
 
 
-def buildGainMap(G, sol):
-    start = time.perf_counter()
-    global mapGain
-    global gainTime
-    if mapGain != {} or mapGain == None:
-        mapGain = {}
-    for x in range(G.numberOfNodes()):
-        mapGain[x] = 0
-    for u, v, w in G.iterEdgesWeights():
-        if sol[u] == sol[v]:
-            mapGain[u] += w
-        else:
-            mapGain[v] -= w
-    end = time.perf_counter()
-    gainTime += (end - start)
 
 def buildParts(G, sol):
     S.clear()
@@ -234,55 +212,8 @@ def buildParts(G, sol):
             T.append(x)
     return
 
-def pairwiseGain(G, sol):
-    global pairTime
-    pwGain = []
-    start = time.perf_counter()
-    for i in range(len(S)):
-        for j in range(len(T)):
-            pwGain.append((mapGain[S[i]] + mapGain[T[j]] + 2*G.weight(S[i], T[j]), S[i], T[j]))
-    end = time.perf_counter()
-    pairTime += (end - start)
-    return sorted(pwGain)
-
     
-def pairwiseSubProb(G, sol, sp_size):
-    n = G.numberOfNodes()
-    subprob = nw.graph.Graph(n=2*(1+sp_size), weighted = True, directed = False)
-    pwGain = pairwiseGain(G, sol)
-    pwGain.reverse()
-    used = {}
-    mapProbToSubProb = {}
-    totalGain = 0
-    ct = 0
-    i = 0
-    idx = 0
-    while(ct < sp_size and i < len(pwGain)):
-        v1 = pwGain[i][1]
-        v2 = pwGain[i][2]
-        if v1 not in used and v2 not in used:
-            mapProbToSubProb[v1] = idx
-            idx += 1
-            mapProbToSubProb[v2] = idx
-            idx += 1
-            ct += 1
-            totalGain += pwGain[i][0]
-        i += 1
 
-    for x in G.iterNodes():
-        if x not in mapProbToSubProb.keys():
-            if sol[x] == 0:
-                mapProbToSubProb[x] = idx
-            if sol[x] == 1:
-                mapProbToSubProb[x] = idx + 1
-
-    for u, v in G.iterEdges():
-        spu = mapProbToSubProb[u]
-        spv = mapProbToSubProb[v]
-        if spu != spv:
-            subprob.increaseWeight(spu, spv, G.weight(u,v))
-
-    return (subprob, mapProbToSubProb, totalGain)
 
 def calcDensity(G):
     e = G.numberOfEdges()
@@ -290,37 +221,21 @@ def calcDensity(G):
     return (2*e) / (n *(n-1))
             
 
-def randSubProb(G, sp_size, sol):
-    subprob = nw.graph.Graph(n=2*(1 + sp_size), weighted = True, directed = False )
-    random.shuffle(S)
-    random.shuffle(T)
-    mapProbToSubProb = {}
-    idx = 0
-    for i in range(sp_size):
-        mapProbToSubProb[S[i]] = idx
-        idx += 1
 
-    for i in range(sp_size):
-        mapProbToSubProb[T[i]] = idx
-        idx += 1
-
-
-    for i in range(sp_size, len(S)):
-        mapProbToSubProb[S[i]] = idx
-
+def trivial(sp, sol):
+    idx = sp.numberOfNodes() - 2
+    count = 0
+    res = True
+    for u in sp.iterNodes():
         
-    for i in range(sp_size, len(T)):
-        mapProbToSubProb[T[i]] = idx+1
-
-        
-    n = G.numberOfNodes()
-    for u, v in G.iterEdges():
-        spu = mapProbToSubProb[u]
-        spv = mapProbToSubProb[v]
-        if spu != spv:
-            subprob.increaseWeight(spu, spv, G.weight(u,v))
-
-    return (subprob, mapProbToSubProb, 0)
+        for v in sp.iterNeighbors(u):
+            if u == idx or u == idx + 1 or v == idx or v == idx+1:
+                continue
+            if sol[u] == sol[v]:
+                count += 1
+                res = False
+    print(count)
+    return res
 
 
 def randPairSubProb(G, sol, sp_size):
@@ -383,6 +298,56 @@ def randPairSubProb(G, sol, sp_size):
     return (subprob, mapProbToSubProb, totalGain)
 
 
+def randGainSubProb(G, sol, sp_size):
+    subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
+    sampleSize = 10 * sp_size
+    sample = [x for x in range(G.numberOfNodes())]
+    random.shuffle(sample)
+    sample = sample[:sampleSize]
+    gain = []
+    for x in sample:
+        gain.append((nodeGain(G, sol, x), x))
+        
+    gain = sorted(gain)
+    gain.reverse()
+
+    mapProbToSubProb = {}
+    totalGain = 0
+    ct =0
+    i = 0
+    idx =0
+    while i < sp_size:
+        u = gain[i][1]
+        mapProbToSubProb[u] = idx
+        idx += 1
+        i += 1
+
+
+
+    keys = mapProbToSubProb.keys()
+    total = 0
+    j = 0
+    while j < sp_size:
+        u = gain[j][1]
+        spu = mapProbToSubProb[u]
+        for v, w in G.iterNeighborsWeights(u):
+            if v not in keys:
+                if sol[v] == 0:
+                    spv = idx
+                else:
+                    spv = idx + 1
+                subprob.increaseWeight(spu, spv, w)
+            else:
+                spv = mapProbToSubProb[v]
+                if u < v:
+                    subprob.increaseWeight(spu, spv, w)
+            total += w
+        j += 1
+
+    subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
+    return (subprob, mapProbToSubProb, idx)
+
+
 
 def qaoa(G):
     n = G.numberOfNodes()
@@ -427,68 +392,51 @@ def qaoa(G):
 
 
 def refine(G, sol, sp_size, obj, rmethod, spsolver, sp=None):
-    global buildSpTime
-    global solveTime
-    start = time.perf_counter()
     if sp != None:
         subprob = sp
-    elif rmethod == "spectral":
-        subprob = spectralGainSubProb(G, sol, sp_size)
-    elif rmethod == "pairwise":
-        subprob = pairwiseSubProb(G, sol, sp_size)
-    elif rmethod == "randpair":
+    elif rmethod == 'randpair':
         subprob = randPairSubProb(G, sol, sp_size)
     else:
-        subprob = randSubProb(G, sp_size, sol)
-    end = time.perf_counter()
-    buildSpTime += (end - start)
-    eGain = subprob[2]
-    mapProbToSubProb = subprob[1]
+        subprob = randGainSubProb(G, sol, sp_size)
 
-    start = time.perf_counter()
+    idx = subprob[2]
+    mapProbToSubProb = subprob[1]
+    old_sol = {}
+    old_sol[idx] = 0
+    old_sol[idx+1] = 1
     if spsolver == "qbsolv":
         Q = build_qubo(subprob[0])
         response = QBSolv().sample_qubo(Q)
         solution = response.samples()[0]
-    
     elif spsolver == "qaoa":
         solution = qaoa(subprob[0])
     elif spsolver == "gurobi":
         solution = pyomo(subprob[0], spsolver)
-    elif spsolver == "cbc":
+    elif spsolver == "ipopt":
         solution = pyomo(subprob[0], spsolver)
     elif spsolver == "sampling":
         solution = randSampleSolve(subprob[0])
-    end = time.perf_counter()
-    solveTime += (end - start)
+
+    
     n = G.numberOfNodes()
     new_sol = {}
-    changed = set()
+    
+    keys = mapProbToSubProb.keys()
     for i in range(n):
-        new_sol[i] = solution[mapProbToSubProb[i]]
-        if sol[i] != new_sol[i]:
-            changed.add(i)
-    new_obj = calc_obj(subprob[0], solution)
-    rGain = new_obj - obj
-          
+        if i in keys:
+            old_sol[mapProbToSubProb[i]] = sol[i]
+            new_sol[i] = solution[mapProbToSubProb[i]]
+        else:
+            if sol[i] == 0:
+                new_sol[i] = solution[idx]
+            else:
+                new_sol[i] = solution[idx+1]
+    new_obj = calc_obj(G, new_sol)
+    if checktrivial == 1:
+        if trivial(subprob[0], old_sol):
+            trivialsp += 1
+
     if new_obj > obj:
-        for x in G.iterNodes():
-            if sol[x] != new_sol[x]:
-                if sol[x] == 0:
-                        S.remove(x)
-                        T.append(x)
-                elif sol[x] == 1:
-                        T.remove(x)
-                        S.append(x)
-        if rmethod == 'pairwise':
-            for x in changed:
-                for y in G.iterNeighbors(x):
-                    if new_sol[x] == new_sol[y]:
-                        mapGain[x] -= 2*G.weight(x, y)
-                        mapGain[y] -= 2*G.weight(x, y)
-                    if new_sol[x] != new_sol[y]:
-                        mapGain[x] += 2*G.weight(x, y)
-                        mapGain[y] += 2*G.weight(x, y)
         return (new_sol, new_obj, subprob)
 
     else:
@@ -534,17 +482,9 @@ def spectralCoarsening(G, GVs):
     def column(m, i):
         return [row[i] for row in m]
     
-    matrix = nw.algebraic.laplacianMatrix(G)
-
-    w,v = scipy.sparse.linalg.eigsh(matrix,3, which="LM",maxiter=10000,tol=0.00001)
-    orderlist = zip(w, range(0, len(w)))
-    orderlist = sorted(orderlist)
-    orderedW = column(orderlist, 0)
-    orderedV = [v[:,i] for i in column(orderlist, 1)]
-    eigvectors = (orderedW, orderedV)
-
-    eigvec = eigvectors[1][1]
-    print('calced eigenvector')
+    nxG = nw.nxadapter.nk2nx(G)
+    
+    eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.00001,method='lobpcg')
     orderedNodes = []
     for i in range(len(eigvec)):
         orderedNodes.append((eigvec[i], i))
@@ -608,66 +548,159 @@ def randInitialSolution(G):
 
 
 
-def no_ML(G):
-    solution = randInitialSolution(G)
-    obj = 0
-    new_solution = {}
-    refinements = 0
-    for j in range(G.numberOfNodes()):
-            new_solution[j] = solution[j]
-    obj = calc_obj(G, solution)
-    buildParts(G, solution)
-    ct = 0
-    improvect = 0
-    maximprove = 0
-    minimprove = obj
-    improveavg = 0
-    
-    while ct < 5:
-        res = refine(G, solution, spsize, obj, method, solver)                
-        refinements += 1
-        solution = res[0]
-        new_obj = res[1]
-        if new_obj == obj:
-            ct += 1
-        else:
-            ct = 0
-            obj = new_obj
-    return obj
-
 def sparsify_graph(G, ratio):
+    ratio = (1-ratio)
     ffs = nw.sparsification.ForestFireSparsifier(0.1, ratio)
     sparse = ffs.getSparsifiedGraphOfSize(G, ratio)
     sparse.indexEdges()
+    sparse = repair_graph(G, sparse)
+
     return sparse
 
+
+
+
+
+
+def getComponents(G):
+    q = Queue(maxsize = 0)
+    idx = 0
+    i = 0
+    componentMap = {}
+    components = {}
+    mns = 0
+    while mns < G.numberOfNodes():
+        q.put(mns)
+        components[idx] = set()
+        while not q.empty():
+            u = q.get()
+            if componentMap.get(u) == None:
+                componentMap[u] = idx
+                components[idx].add(u)
+                for v in G.iterNeighbors(u):
+                    q.put(v)
+        for i in range(mns, G.numberOfNodes()+1):
+            if componentMap.get(i) == None:
+                mns = i
+                break
+        idx += 1
+    return components, componentMap, idx
+            
+
+
+def sparsify(G, ratio):
+    n = G.numberOfNodes()
+    m = G.numberOfEdges()
+
+    deletedEdges = set()
+    total = (n*(n-1))
+    e_del = 0
+    e_goal = m - int(ratio*total)
+    if e_goal <= 0:
+        return G
+    nodeQueue = Queue(maxsize = 0)
+    nodeQueue.put(random.randint(0, n-1))
+
+    while(e_del < e_goal):
+        u = nodeQueue.get()
+        for v in G.iterNeighbors(u):
+            w = G.weight(u,v)
+            e = (u, v, w) if u < v else (v, u, w)
+            if w != 0 and e not in deletedEdges:
+                if random.randint(0, 100) / 100 < ratio:
+                    deletedEdges.add(e)
+                    e_del += 1
+                    if e_del == e_goal:
+                        break
+                    nodeQueue.put(v)
+        if nodeQueue.empty():
+            nodeQueue.put(random.randint(0,n-1))
+    
+    nG = nw.graph.Graph(n=G.numberOfNodes(), directed=False,weighted=True)
+    for u,v,w in G.iterEdgesWeights():
+        nG.setWeight(u,v,w)
+        
+    for e in deletedEdges:
+        if e[2] != 0:
+            nG.removeEdge(e[0],e[1])
+    C = getComponents(nG)
+    
+    
+    if C[2] != 1:
+        for e in deletedEdges:
+            u = e[0]
+            v = e[1]
+            w = e[2]
+            cu = C[1][u]
+            cv = C[1][v]
+            c = C[0]
+            if cu != cv:
+                nG.setWeight(u,v,w)
+                for i in c[cv]:
+                    c[cu].add(i)
+                    C[1][i] = cu
+                c[cv] = None
+            elif random.randint(0,100) < 3:
+                nG.setWeight(u,v,w)
+
+        
+
+    return nG
+
+
+
+
+
+
+
+
+def repair_graph(G, sparse):
+    sparse_components = nw.components.ConnectedComponents(sparse)
+    sparse_components.run()
+    decomp = sparse_components.getComponents()
+                
+    while sparse_components.numberOfComponents() > 1:
+        for i in range(1, len(decomp)):
+            for u in decomp[i]:
+                connected = False
+                for v in G.iterNeighbors(u):
+                    if sparse_components.componentOfNode(v) == 0:
+                        sparse.addEdge(u, v, G.weight(u,v))
+                        connected = True
+                if connected:
+                    break
+        sparse_components = nw.components.ConnectedComponents(sparse)
+        sparse_components.run()
+        decomp = sparse_components.getComponents()
+    return sparse
+
+    
 def calc_density(G):
     e = G.numberOfEdges()
     n = G.numberOfNodes()
     return (2*e) / (n*(n-1))
 
 
+
+
 def maxcut_solve(G):
-    global S
-    global T
-    global cSolves
-    global qSolves
-    global ties
-    global dbf
+
     refinements = 0
     print(gname)
     print(str(G))
-    print(method)
+
     start = time.perf_counter()
     problem_graph = G
 
     density_cutoff = calc_density(G)
     density = density_cutoff
     if density > 0.4:
-        G = sparsify_graph(G, 0.4)
+        sG = sparsify(G, 0.4)
         density_cutoff = calc_density(G)
         density = density_cutoff
-    hierarchy = [G]
+    else:
+        sG = G
+    hierarchy = [(G,sG)]
     hierarchy_map = []
     old = G.numberOfNodes()
     new = 0
@@ -680,8 +713,11 @@ def maxcut_solve(G):
         G = coarse[0]
         GVs = coarse[2]
         if calc_density(G) > density_cutoff:
-            G = sparsify_graph(G, density_cutoff)
-        hierarchy.append(G)
+            sG = sparsify(G, density_cutoff)
+        else:
+            sG = G
+
+        hierarchy.append((G,sG))
         hierarchy_map.append(coarse[1])
         new = G.numberOfNodes()
     end = time.perf_counter()
@@ -691,13 +727,12 @@ def maxcut_solve(G):
     solution = randInitialSolution(G)
     obj = 0
     for i in range(len(hierarchy_map)):
-        fG = hierarchy[i+1]
-        cG = hierarchy[i]
+        fG = hierarchy[i+1][0]
+        cG = hierarchy[i][0]
+        sG = hierarchy[i+1][1]
         fMap = hierarchy_map[i]
         print("\n\nLEVEL " + str(i))
-        debug_graph(fG)
-        print(len(solution))
-        print("OBJECTIVE BEFORE REFINING: " + str(calc_obj(cG,solution)))
+       # debug_graph(fG)
         new_solution = {}
                 
         for j in range(cG.numberOfNodes()):
@@ -705,109 +740,30 @@ def maxcut_solve(G):
                 new_solution[x] = solution[j]
         solution = new_solution
         obj = calc_obj(fG, solution)
-        buildParts(fG, solution)
         ct = 0
-        improvect = 0
-        maximprove = 0
-        minimprove = obj
-        improveavg = 0
-        print("\nREFINEMENTS FOR THIS LEVEL BELOW\n")
-        while ct < 5:
-            if method == 'pairwise':
-                buildGainMap(fG, solution)
-            if solver != 'hybrid':
-                res = refine(fG, solution, spsize, obj, method, solver)                
-                refinements += 1
-                solution = res[0]
-                new_obj = res[1]
-            elif solver == "hybrid":
-                os = solution.copy()
-                ps = solution.copy()
-                tS = S[:]
-                tT = T[:]
-                res = refine(fG, solution, spsize, obj, method, "qaoa")
-                sp = res[2]
-                solution = res[0]
-                new_obj = res[1]
-                tS2 = S[:]
-                tT2 = T[:]
-                S = tS
-                T = tT
-                res = refine(fG, os, spsize, obj, method, "sampling", sp)
-                if res[1] > new_obj:
-                        cSolves += 1
-                        solution = res[0]
-                        new_obj = res[1]
-                else:
-                    if res[1] == new_obj:
-                        ties += 1                        
-                    else:
-                        qSolves += 1
-                    S = tS2
-                    T = tT2
-                refinements += 1
-            if new_obj == obj:
+
+        while ct < 3:
+            res = refine(sG, solution, spsize, obj, method, solver)
+            refinements += 1
+            solution = res[0]
+            new_obj = res[1]
+            if new_obj <= obj:
                 ct += 1
             else:
-                improvement = new_obj - obj
-                improveavg += improvement
-                improvect += 1
-                if improvement > maximprove:
-                    maximprove = improvement
-                if improvement < minimprove:
-                    minimprove = improvement
                 ct = 0
-            obj = new_obj
-        if method != 'pairwise':
-            buildGainMap(fG, solution)
-            while True:
-                if solver != 'hybrid':
-                    res = refine(fG, solution, spsize, obj, method, solver)                
-                    refinements += 1
-                    solution = res[0]
-                    new_obj = res[1]
-                elif solver == "hybrid":
-                    os = solution.copy()
-                    tS = S[:]
-                    tT = T[:]
-                    res = refine(fG, solution, spsize, obj, method, "qaoa")
-                    solution = res[0]
-                    new_obj = res[1]
-                    sp = res[2]
-                    tS2 = S[:]
-                    tT2 = T[:]
-                    S = tS
-                    T = tT
-                    res = refine(fG, os, spsize, obj, method, "sampling", sp)
-                    if res[1] > new_obj:
-                        cSolves += 1
-                        solution = res[0]
-                        new_obj = res[1]
-                    else:
-                        if res[1] == new_obj:
-                            ties += 1
-                        else:
-                            qSolves += 1
-                        S = tS2
-                        T = tT2
-                    refinements += 1
-                if new_obj == obj:
-                    break
-                else:
-                    improvement = new_obj - obj
-                    improveavg += improvement
-                    improvect += 1
-                    if improvement > maximprove:
-                        maximprove = improvement
-                        if improvement < minimprove:
-                            minimprove = improvement
+                obj = new_obj
+        ct = 0
+        while ct < 5:
+            res = refine(fG, solution, spsize, obj, method, solver)                
+            refinements += 1
+            solution = res[0]
+            new_obj = res[1]
+            if new_obj <= obj:
+                ct += 1
+            else:
+                ct = 0
                 obj = new_obj
         print("\nTOTAL REFINEMENTS: " + str(refinements))
-        print("NUMBER OF IMPROVEMENTS: " + str(improvect))
-        if improvect > 0:
-            print("AVERAGE IMPROVEMENT: " + str(improveavg/improvect))
-        print("MINIMUM IMPROVEMENT: " + str(minimprove))
-        print("MAXIMUM IMPROVEMENT: " + str(maximprove))
         print("OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
 
@@ -822,15 +778,14 @@ elif gformat == 'elist':
 
 
 
-G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 
+G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
+print(str(G))
 s = time.perf_counter()
 if useml == False:
     obj = maxcut_solve(G)
 elif useml == True:
     obj = no_ML(G)
 e = time.perf_counter()
+#print(trivialsp)
 print("Found maximum value for " + str(gname) + " of " + str(obj) + " " + str(e-s) + "s")
-print("Qct = " + str(qct))
-if solver == 'hybrid':
-    print("Quantum: " + str(qSolves) + " Classical: " + str(cSolves) + " Ties: " + str(ties))
