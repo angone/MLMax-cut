@@ -14,26 +14,23 @@ faulthandler.enable()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gname", type = str, default = "None", help = "graph file")
-parser.add_argument("-method", type = str, default = "None", help = "ref method")
-parser.add_argument("-spsize", type = int, default = 20, help = "size of subproblems")
-parser.add_argument("-solver", type = str, default = "qbsolv", help = "qubo slver")
+parser.add_argument("-method", type = str, default = "None", help = "refinement method")
+parser.add_argument("-spsize", type = int, default = 18, help = "size of subproblems")
+parser.add_argument("-solver", type = str, default = "qbsolv", help = "subproblem solver")
 parser.add_argument("-optimizer", type = str, default = "COBYLA", help = "qaoa optimizer")
-parser.add_argument("-gformat", type = str, default = "alist", help = "graph format")
-parser.add_argument("-nomultilvl", type = bool, default = False, help = "Use/Dont Use Multilevel")
-parser.add_argument("-checktrivial", type = int, default = 0)
+parser.add_argument("-gformat", type = str, default = "elist", help = "graph format")
+
 
 args = parser.parse_args()
 
 
-useml = args.nomultilvl
 method = args.method
 gname = args.gname
 spsize = args.spsize
 solver = args.solver
 optimizer = args.optimizer
 gformat = args.gformat
-checktrivial = args.checktrivial
-trivialsp = 0
+
 
 
 
@@ -394,8 +391,6 @@ def qaoa(G):
 def refine(G, sol, sp_size, obj, rmethod, spsolver, sp=None):
     if sp != None:
         subprob = sp
-    elif rmethod == 'randpair':
-        subprob = randPairSubProb(G, sol, sp_size)
     else:
         subprob = randGainSubProb(G, sol, sp_size)
 
@@ -472,60 +467,147 @@ def calc_imbalance(sol,n):
     return abs(t - s) / ((s + t)/2)
 
 
+def informedMatching(G, GVs, tol=0):
+    n = G.numberOfNodes()
+    nxG = nw.nxadapter.nk2nx(G)
+    eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.0001,method='lobpcg')
+    orderedNodes = []
+    for i in range(len(eigvec)):
+        orderedNodes.append((eigvec[i],i))
+    orderedNodes.sort()
+    orderedNodes.reverse()
+    used = set()
+    matching = set()
+    optionCt = 1 + tol*2
+    for i in range(n):
+        u = orderedNodes[i][1]
+        prob = GVs[u][0] / GVs[u][1]
+        upart = 1 if random.random() < prob else 0
+        if u in used:
+            continue
+        used.add(u)
+        options = [(i + int(n/2) + j) % n for j in range(0-tol, 0+tol+1)]
+        c = random.randint(0,optionCt-1)
+        j = options[c]
+        v = orderedNodes[j][1]
+        prob = GVs[v][0] / GVs[v][1]
+        vpart = 1 if random.random() < prob else 0
+        ct = 0
+        retry = False
+        while v in used and vpart != upart:
+            j = (j+1) % n
+            v = orderedNodes[j][1]
+            ct += 1
+            if ct > 2*optionCt:
+                retry = True
+                break
+        if retry:
+            while v in used:
+                j = (j+1) % n
+                v = orderedNodes[j][1]
+        used.add(v)
+        matching.add((u,v))
+    remaining = -1
+    if n % 2 == 1:
+        for x in orderedNodes:
+            if x[1] not in used:
+                remaining = x[1]
+        
+
+    return matching, remaining
 
 
 
-def spectralCoarsening(G, GVs):
+def spectralMatching(G, tol=0):
+    n = G.numberOfNodes()
+    nxG = nw.nxadapter.nk2nx(G)
+    eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.0001,method='lobpcg')
+    orderedNodes = []
+    for i in range(len(eigvec)):
+        orderedNodes.append((eigvec[i],i))
+    orderedNodes.sort()
+    orderedNodes.reverse()
+    used = set()
+    matching = set()
+    optionCt = 1 + tol*2
+    for i in range(n):
+        u = orderedNodes[i][1]
+        if u in used:
+            continue
+        used.add(u)
+        options = [(i + int(n/2) + j) % n for j in range(0-tol, 0+tol+1)]
+        c = random.randint(0,optionCt-1)
+        j = options[c]
+        v = orderedNodes[j][1]
+        ct = 0
+        while v in used:
+            j = (j+1) % n
+            v = orderedNodes[j][1]
+            ct += 1
+            
+        used.add(v)
+        matching.add((u,v))
+    remaining = -1
+    if n % 2 == 1:
+        for x in orderedNodes:
+            if x[1] not in used:
+                remaining = x[1]
+        
+        
+
+    return matching, remaining
+
+
+def randomMatching(G):
+    n = G.numberOfNodes()
+    matching = set()
+    used = set()
+    R = -1
+    for i in range(n):
+        if i in used:
+            continue
+        used.add(i)
+        j = random.randint(i,n-1)
+        while j in used:
+            j = j+1
+        used.add(j)
+        matching.add((i,j))
+    for i in range(n):
+        if i not in used:
+            R = i
+            break
+    return matching, R
+
+
+def matchingCoarsening(G,C):
     edgesDropped = 0
     edgesAggregated = 0
 
-    def column(m, i):
-        return [row[i] for row in m]
     
     nxG = nw.nxadapter.nk2nx(G)
     
-    eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.00001,method='lobpcg')
-    orderedNodes = []
-    for i in range(len(eigvec)):
-        orderedNodes.append((eigvec[i], i))
-    orderedNodes.sort()
-    orderedNodes.reverse()
-    n = len(orderedNodes)
+    n = G.numberOfNodes()
     i = 0
     j = int(n/2)
     mapCoarseToFine = {}
     mapFineToCoarse = {}
     idx = 0
-    newGVs = {}
-    while i < int(n/2) and j < n:
-        u = orderedNodes[i][1]
-        v = orderedNodes[j][1]
-        if G.weight(u, v) != 0:
-            edgesDropped += 1
-        for x in G.iterNeighbors(u):
-            if G.weight(v, x) != 0:
-                edgesAggregated += 1
-                
+    if C == 0:
+        M, R = spectralMatching(G, 2)
+    elif C == 1:
+        M, R = randomMatching(G)
+    elif C == 2:
+        M, R = informedMatching(G, 2, GVs)
+    print(n)
+    print(len(M))
+    for u, v in M:
         mapCoarseToFine[idx] = [u, v]
         mapFineToCoarse[u] = idx
         mapFineToCoarse[v] = idx
-        newGVs[idx] = G.weight(u, v)
-        if GVs != {}:
-            newGVs[idx] += GVs[u]
-            newGVs[idx] += GVs[v]
         idx += 1
-        i += 1
-        j += 1
     if n % 2 == 1:
-        u = orderedNodes[j][1]
-        mapCoarseToFine[idx] = [u]
-        mapFineToCoarse[u] = idx
-        newGVs[idx] = 0
-        if GVs != {}:
-            newGVs[idx] += GVs[u]
-        idx += 1
-        
-        
+        mapCoarseToFine[idx] = [R]
+        mapFineToCoarse[R] = idx
     cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
     for u,v in G.iterEdges():
         cu = mapFineToCoarse[u]
@@ -533,8 +615,7 @@ def spectralCoarsening(G, GVs):
         cG.increaseWeight(cu, cv, G.weight(u, v))
     cG.removeSelfLoops()
     cG.indexEdges()
-    return (cG, mapCoarseToFine, newGVs)
-
+    return (cG, mapCoarseToFine)
 
 
 
@@ -544,23 +625,6 @@ def randInitialSolution(G):
         sol[x] = random.randint(0,1)
     return sol
        
-    
-
-
-
-def sparsify_graph(G, ratio):
-    ratio = (1-ratio)
-    ffs = nw.sparsification.ForestFireSparsifier(0.1, ratio)
-    sparse = ffs.getSparsifiedGraphOfSize(G, ratio)
-    sparse.indexEdges()
-    sparse = repair_graph(G, sparse)
-
-    return sparse
-
-
-
-
-
 
 def getComponents(G):
     q = Queue(maxsize = 0)
@@ -648,32 +712,6 @@ def sparsify(G, ratio):
     return nG
 
 
-
-
-
-
-
-
-def repair_graph(G, sparse):
-    sparse_components = nw.components.ConnectedComponents(sparse)
-    sparse_components.run()
-    decomp = sparse_components.getComponents()
-                
-    while sparse_components.numberOfComponents() > 1:
-        for i in range(1, len(decomp)):
-            for u in decomp[i]:
-                connected = False
-                for v in G.iterNeighbors(u):
-                    if sparse_components.componentOfNode(v) == 0:
-                        sparse.addEdge(u, v, G.weight(u,v))
-                        connected = True
-                if connected:
-                    break
-        sparse_components = nw.components.ConnectedComponents(sparse)
-        sparse_components.run()
-        decomp = sparse_components.getComponents()
-    return sparse
-
     
 def calc_density(G):
     e = G.numberOfEdges()
@@ -683,7 +721,7 @@ def calc_density(G):
 
 
 
-def maxcut_solve(G):
+def maxcut_solve(G, C):
 
     refinements = 0
     print(gname)
@@ -704,14 +742,12 @@ def maxcut_solve(G):
     hierarchy_map = []
     old = G.numberOfNodes()
     new = 0
-    GVs = {}
     while(abs(new - old) > 2*spsize):
         old = G.numberOfNodes()
         if old <= 2*(1+spsize):
             break
-        coarse= spectralCoarsening(G, GVs)    
+        coarse= matchingCoarsening(G,C)    
         G = coarse[0]
-        GVs = coarse[2]
         if calc_density(G) > density_cutoff:
             sG = sparsify(G, density_cutoff)
         else:
@@ -732,7 +768,6 @@ def maxcut_solve(G):
         sG = hierarchy[i+1][1]
         fMap = hierarchy_map[i]
         print("\n\nLEVEL " + str(i))
-       # debug_graph(fG)
         new_solution = {}
                 
         for j in range(cG.numberOfNodes()):
@@ -782,10 +817,6 @@ elif gformat == 'elist':
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
-if useml == False:
-    obj = maxcut_solve(G)
-elif useml == True:
-    obj = no_ML(G)
+obj = maxcut_solve(G, 0)
 e = time.perf_counter()
-#print(trivialsp)
 print("Found maximum value for " + str(gname) + " of " + str(obj) + " " + str(e-s) + "s")
