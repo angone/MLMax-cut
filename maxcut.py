@@ -199,102 +199,6 @@ def nodeGain(G, sol, u):
 
 
 
-def buildParts(G, sol):
-    S.clear()
-    T.clear()
-    for x in range(G.numberOfNodes()):
-        if sol[x] == 0:
-            S.append(x)
-        elif sol[x] == 1:
-            T.append(x)
-    return
-
-    
-
-
-def calcDensity(G):
-    e = G.numberOfEdges()
-    n = G.numberOfNodes()
-    return (2*e) / (n *(n-1))
-            
-
-
-def trivial(sp, sol):
-    idx = sp.numberOfNodes() - 2
-    count = 0
-    res = True
-    for u in sp.iterNodes():
-        
-        for v in sp.iterNeighbors(u):
-            if u == idx or u == idx + 1 or v == idx or v == idx+1:
-                continue
-            if sol[u] == sol[v]:
-                count += 1
-                res = False
-    print(count)
-    return res
-
-
-def randPairSubProb(G, sol, sp_size):
-    subprob = nw.graph.Graph(n=2*(1 + sp_size), weighted = True, directed = False )
-    rpS = []
-    rpT = []
-    sampleSize = 10*sp_size
-    if len(S) < sampleSize:
-        rpS = S[0:len(S)]
-    else:
-        for _ in range(sampleSize):
-            i = random.randint(0, len(S)-1)
-            rpS.append(S[i])
-    if len(T) < sampleSize:
-        rpT = T[0:len(T)]
-    else:
-        for _ in range(sampleSize):
-            i = random.randint(0, len(T)-1)
-            rpT.append(T[i])
-            
-    pwGain = []
-    for i in range(len(rpS)):
-        for j in range(len(rpT)):
-            pwGain.append((swapGain(G, sol, rpS[i], rpT[j]), rpS[i], rpT[j]))
-
-    pwGain = sorted(pwGain)
-    pwGain.reverse()
-    
-    used = {}
-    mapProbToSubProb = {}
-    totalGain = 0
-    ct = 0
-    i = 0
-    idx = 0
-    while(ct < sp_size and i < len(pwGain)):
-        v1 = pwGain[i][1]
-        v2 = pwGain[i][2]
-        if v1 not in used and v2 not in used:
-            mapProbToSubProb[v1] = idx
-            idx += 1
-            mapProbToSubProb[v2] = idx
-            idx += 1
-            ct += 1
-            totalGain += pwGain[i][0]
-        i += 1
-
-    for x in G.iterNodes():
-        if x not in mapProbToSubProb.keys():
-            if sol[x] == 0:
-                mapProbToSubProb[x] = idx
-            if sol[x] == 1:
-                mapProbToSubProb[x] = idx + 1
-
-    for u, v in G.iterEdges():
-        spu = mapProbToSubProb[u]
-        spv = mapProbToSubProb[v]
-        if spu != spv:
-            subprob.increaseWeight(spu, spv, G.weight(u,v))
-            
-    return (subprob, mapProbToSubProb, totalGain)
-
-
 def randGainSubProb(G, sol, sp_size):
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     sampleSize = 10 * sp_size
@@ -427,9 +331,6 @@ def refine(G, sol, sp_size, obj, rmethod, spsolver, sp=None):
             else:
                 new_sol[i] = solution[idx+1]
     new_obj = calc_obj(G, new_sol)
-    if checktrivial == 1:
-        if trivial(subprob[0], old_sol):
-            trivialsp += 1
 
     if new_obj > obj:
         return (new_sol, new_obj, subprob)
@@ -471,16 +372,16 @@ def informedMatching(G, GVs, tol=0):
     n = G.numberOfNodes()
     nxG = nw.nxadapter.nk2nx(G)
     eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.0001,method='lobpcg')
-    orderedNodes = []
+    F = []
     for i in range(len(eigvec)):
-        orderedNodes.append((eigvec[i],i))
-    orderedNodes.sort()
-    orderedNodes.reverse()
+        F.append((eigvec[i],i))
+    F.sort()
+    F.reverse()
     used = set()
     matching = set()
     optionCt = 1 + tol*2
     for i in range(n):
-        u = orderedNodes[i][1]
+        u = F[i][1]
         prob = GVs[u][0] / GVs[u][1]
         upart = 1 if random.random() < prob else 0
         if u in used:
@@ -489,14 +390,14 @@ def informedMatching(G, GVs, tol=0):
         options = [(i + int(n/2) + j) % n for j in range(0-tol, 0+tol+1)]
         c = random.randint(0,optionCt-1)
         j = options[c]
-        v = orderedNodes[j][1]
+        v = F[j][1]
         prob = GVs[v][0] / GVs[v][1]
         vpart = 1 if random.random() < prob else 0
         ct = 0
         retry = False
         while v in used and vpart != upart:
             j = (j+1) % n
-            v = orderedNodes[j][1]
+            v = F[j][1]
             ct += 1
             if ct > 2*optionCt:
                 retry = True
@@ -504,17 +405,17 @@ def informedMatching(G, GVs, tol=0):
         if retry:
             while v in used:
                 j = (j+1) % n
-                v = orderedNodes[j][1]
+                v = F[j][1]
         used.add(v)
         matching.add((u,v))
     remaining = -1
     if n % 2 == 1:
-        for x in orderedNodes:
+        for x in F:
             if x[1] not in used:
                 remaining = x[1]
         
 
-    return matching, remaining
+    return matching, remaining, F
 
 
 
@@ -522,27 +423,27 @@ def spectralMatching(G, tol=0):
     n = G.numberOfNodes()
     nxG = nw.nxadapter.nk2nx(G)
     eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.0001,method='lobpcg')
-    orderedNodes = []
+    F = []
     for i in range(len(eigvec)):
-        orderedNodes.append((eigvec[i],i))
-    orderedNodes.sort()
-    orderedNodes.reverse()
+        F.append((eigvec[i],i))
+    F.sort()
+    F.reverse()
     used = set()
     matching = set()
     optionCt = 1 + tol*2
     for i in range(n):
-        u = orderedNodes[i][1]
+        u = F[i][1]
         if u in used:
             continue
         used.add(u)
         options = [(i + int(n/2) + j) % n for j in range(0-tol, 0+tol+1)]
         c = random.randint(0,optionCt-1)
         j = options[c]
-        v = orderedNodes[j][1]
+        v = F[j][1]
         ct = 0
         while v in used:
             j = (j+1) % n
-            v = orderedNodes[j][1]
+            v = F[j][1]
             ct += 1
             
         used.add(v)
@@ -555,7 +456,7 @@ def spectralMatching(G, tol=0):
         
         
 
-    return matching, remaining
+    return matching, remaining, F
 
 
 def randomMatching(G):
@@ -579,7 +480,7 @@ def randomMatching(G):
     return matching, R
 
 
-def matchingCoarsening(G,C):
+def matchingCoarsening(G,C,GVs=None):
     edgesDropped = 0
     edgesAggregated = 0
 
@@ -592,22 +493,28 @@ def matchingCoarsening(G,C):
     mapCoarseToFine = {}
     mapFineToCoarse = {}
     idx = 0
+    F = None
+    
+    newGVs = {} if GVs != None else None
     if C == 0:
-        M, R = spectralMatching(G, 2)
+        M, R, F = spectralMatching(G, 2)
     elif C == 1:
         M, R = randomMatching(G)
-    elif C == 2:
-        M, R = informedMatching(G, 2, GVs)
-    print(n)
-    print(len(M))
+    elif GVs != None and GVs != None:
+        M, R, F = informedMatching(G, 2, GVs)
     for u, v in M:
         mapCoarseToFine[idx] = [u, v]
         mapFineToCoarse[u] = idx
         mapFineToCoarse[v] = idx
+        if GVs != None:
+            newGVs[idx] = (GVs[u][0] + GVs[v][0], GVs[u][1] + GVs[v][1])
         idx += 1
     if n % 2 == 1:
         mapCoarseToFine[idx] = [R]
         mapFineToCoarse[R] = idx
+        if GVs != None:
+            newGVs[idx] = GVs[R]
+        idx += 1
     cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
     for u,v in G.iterEdges():
         cu = mapFineToCoarse[u]
@@ -615,7 +522,15 @@ def matchingCoarsening(G,C):
         cG.increaseWeight(cu, cv, G.weight(u, v))
     cG.removeSelfLoops()
     cG.indexEdges()
-    return (cG, mapCoarseToFine)
+    newS = []
+    if GVs != None:
+        for i in range(idx):
+            prob = newGVs[i][0] / newGVs[i][1]
+            if prob < random.random():
+                newS.append(1)
+            else:
+                newS.append(0)
+    return (cG, mapCoarseToFine, F, newGVs, newS)
 
 
 
@@ -721,15 +636,19 @@ def calc_density(G):
 
 
 
-def maxcut_solve(G, C):
+def maxcut_solve(G, C, obj=None, S=None):
 
     refinements = 0
     print(gname)
     print(str(G))
-
+    GVs = None
+    if S != None:
+        GVs = {}
+        for i in range(G.numberOfNodes()):
+            GVs[i] = (1,1) if S[i] == 1 else (0,1)
     start = time.perf_counter()
     problem_graph = G
-
+    
     density_cutoff = calc_density(G)
     density = density_cutoff
     if density > 0.4:
@@ -742,12 +661,15 @@ def maxcut_solve(G, C):
     hierarchy_map = []
     old = G.numberOfNodes()
     new = 0
+    fiedler_list = []
     while(abs(new - old) > 2*spsize):
         old = G.numberOfNodes()
         if old <= 2*(1+spsize):
             break
-        coarse= matchingCoarsening(G,C)    
+        coarse= matchingCoarsening(G, C, GVs)    
         G = coarse[0]
+        GVs = coarse[3]
+        fiedler_list.append(coarse[2])
         if calc_density(G) > density_cutoff:
             sG = sparsify(G, density_cutoff)
         else:
@@ -757,11 +679,12 @@ def maxcut_solve(G, C):
         hierarchy_map.append(coarse[1])
         new = G.numberOfNodes()
     end = time.perf_counter()
-    
+    fiedler_list.reverse()
     hierarchy_map.reverse()
     hierarchy.reverse()
     solution = randInitialSolution(G)
-    obj = 0
+    if obj == None:
+        obj = 0
     for i in range(len(hierarchy_map)):
         fG = hierarchy[i+1][0]
         cG = hierarchy[i][0]
@@ -802,7 +725,7 @@ def maxcut_solve(G, C):
         print("OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
 
-    return calc_obj(problem_graph, solution)
+    return calc_obj(problem_graph, solution), solution
 
 
 
@@ -817,6 +740,7 @@ elif gformat == 'elist':
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
-obj = maxcut_solve(G, 0)
+obj, S = maxcut_solve(G, 0)
+obj, S = maxcut_solve(G, 0, S)
 e = time.perf_counter()
 print("Found maximum value for " + str(gname) + " of " + str(obj) + " " + str(e-s) + "s")
