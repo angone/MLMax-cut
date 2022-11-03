@@ -19,6 +19,7 @@ parser.add_argument("-spsize", type = int, default = 18, help = "size of subprob
 parser.add_argument("-solver", type = str, default = "qbsolv", help = "subproblem solver")
 parser.add_argument("-optimizer", type = str, default = "COBYLA", help = "qaoa optimizer")
 parser.add_argument("-gformat", type = str, default = "elist", help = "graph format")
+parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
 
 
 args = parser.parse_args()
@@ -30,8 +31,11 @@ spsize = args.spsize
 solver = args.solver
 optimizer = args.optimizer
 gformat = args.gformat
+cycles = args.cycles
 
 
+
+fiedler_list =[]
 
 
 if solver == 'qaoa':
@@ -197,6 +201,9 @@ def nodeGain(G, sol, u):
             gain -= G.weight(u, x)
     return gain
 
+
+def randLocalSubProb(G, sol, sp_size, F):
+    n = F
 
 
 def randGainSubProb(G, sol, sp_size):
@@ -419,8 +426,7 @@ def informedMatching(G, GVs, tol=0):
 
 
 
-def spectralMatching(G, tol=0):
-    n = G.numberOfNodes()
+def getFiedler(G):
     nxG = nw.nxadapter.nk2nx(G)
     eigvec = nx.linalg.algebraicconnectivity.fiedler_vector(nxG, tol=0.0001,method='lobpcg')
     F = []
@@ -428,6 +434,11 @@ def spectralMatching(G, tol=0):
         F.append((eigvec[i],i))
     F.sort()
     F.reverse()
+    return F
+
+def spectralMatching(G, tol=0):
+    n = G.numberOfNodes()
+    F = getFiedler(G)
     used = set()
     matching = set()
     optionCt = 1 + tol*2
@@ -637,10 +648,11 @@ def calc_density(G):
 
 
 def maxcut_solve(G, C, obj=None, S=None):
-
+    global fiedler_list
     refinements = 0
     print(gname)
     print(str(G))
+    fiedler_list = []
     GVs = None
     if S != None:
         GVs = {}
@@ -679,6 +691,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         hierarchy_map.append(coarse[1])
         new = G.numberOfNodes()
     end = time.perf_counter()
+    fiedler_list.append(getFiedler(G))
     fiedler_list.reverse()
     hierarchy_map.reverse()
     hierarchy.reverse()
@@ -740,7 +753,11 @@ elif gformat == 'elist':
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
-obj, S = maxcut_solve(G, 0)
-obj, S = maxcut_solve(G, 0, S)
+max_obj = 0
+S = None
+for i in range(cycles):
+    obj, S = maxcut_solve(G, 0, S)
+    if obj > max_obj:
+        max_obj = obj
 e = time.perf_counter()
-print("Found maximum value for " + str(gname) + " of " + str(obj) + " " + str(e-s) + "s")
+print("Found maximum value for " + str(gname) + " of " + str(max_obj) + " " + str(e-s) + "s")
