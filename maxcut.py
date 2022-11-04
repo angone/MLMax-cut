@@ -122,7 +122,7 @@ def pyomo(G, solver):
         opt.options['TimeLimit'] = 5
     elif solver == "ipopt":
         opt = pyo.SolverFactory('ipopt')
-        opt.options['max_wall_time'] = 5
+        opt.options['max_cpu_time'] = 5
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
