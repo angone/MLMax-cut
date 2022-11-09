@@ -456,15 +456,16 @@ def spectralMatching(G, tol=0):
             j = (j+1) % n
             v = F[j][1]
             ct += 1
+            if ct > n:
+                break
             
         used.add(v)
         matching.add((u,v))
     remaining = -1
     if n % 2 == 1:
-        for x in orderedNodes:
+        for x in F:
             if x[1] not in used:
                 remaining = x[1]
-        
         
 
     return matching, remaining, F
@@ -496,8 +497,6 @@ def matchingCoarsening(G,C,GVs=None):
     edgesAggregated = 0
 
     
-    nxG = nw.nxadapter.nk2nx(G)
-    
     n = G.numberOfNodes()
     i = 0
     j = int(n/2)
@@ -505,7 +504,6 @@ def matchingCoarsening(G,C,GVs=None):
     mapFineToCoarse = {}
     idx = 0
     F = None
-    
     newGVs = {} if GVs != None else None
     if C == 0:
         M, R, F = spectralMatching(G, 2)
@@ -525,7 +523,6 @@ def matchingCoarsening(G,C,GVs=None):
         mapFineToCoarse[R] = idx
         if GVs != None:
             newGVs[idx] = GVs[R]
-        idx += 1
     cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
     for u,v in G.iterEdges():
         cu = mapFineToCoarse[u]
@@ -533,6 +530,8 @@ def matchingCoarsening(G,C,GVs=None):
         cG.increaseWeight(cu, cv, G.weight(u, v))
     cG.removeSelfLoops()
     cG.indexEdges()
+    C = getComponents(cG)
+
     newS = []
     if GVs != None:
         for i in range(idx):
@@ -590,7 +589,7 @@ def sparsify(G, ratio):
         return G
     nodeQueue = Queue(maxsize = 0)
     nodeQueue.put(random.randint(0, n-1))
-
+    rc = 0
     while(e_del < e_goal):
         u = nodeQueue.get()
         for v in G.iterNeighbors(u):
@@ -605,7 +604,9 @@ def sparsify(G, ratio):
                     nodeQueue.put(v)
         if nodeQueue.empty():
             nodeQueue.put(random.randint(0,n-1))
-    
+            rc += 1
+        if rc > 30:
+            break
     nG = nw.graph.Graph(n=G.numberOfNodes(), directed=False,weighted=True)
     for u,v,w in G.iterEdgesWeights():
         nG.setWeight(u,v,w)
@@ -614,8 +615,6 @@ def sparsify(G, ratio):
         if e[2] != 0:
             nG.removeEdge(e[0],e[1])
     C = getComponents(nG)
-    
-    
     if C[2] != 1:
         for e in deletedEdges:
             u = e[0]
@@ -632,9 +631,6 @@ def sparsify(G, ratio):
                 c[cv] = None
             elif random.randint(0,100) < 3:
                 nG.setWeight(u,v,w)
-
-        
-
     return nG
 
 
@@ -680,6 +676,7 @@ def maxcut_solve(G, C, obj=None, S=None):
             break
         coarse= matchingCoarsening(G, C, GVs)    
         G = coarse[0]
+        print(getComponents(G)[2])
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
         if calc_density(G) > density_cutoff:
