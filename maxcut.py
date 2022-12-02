@@ -10,6 +10,9 @@ import pyomo.environ as pyo
 import scipy
 from queue import Queue
 import faulthandler
+import sympy as sym
+import baseconvert as bc
+import kdtree as kd
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -143,6 +146,100 @@ def pyomo(G, solver):
         else:
             solution[i] = 1
     return solution
+
+
+
+
+
+
+def computeDistance(G, u, d, point, space):
+    obj = 0
+    for v in G.iterNeighbors(u):
+        a = 0
+        for i in range(d):
+            a += (point[i] - space[v][i])**2
+        obj += np.sqrt(a)
+    return obj
+        
+        
+def optimalGuess(G, u, d, guesses, space):
+    bestP = []
+    bestD = 0
+    for i in range(3**d):
+        point = []
+        p = bc.base(str(i),10,3,string=True)
+        j = 0
+        while j < len(p):
+            point.append(guesses[j][int(p[j])])
+            j += 1
+        while j < d:
+            point.append(guesses[j][0])
+            j += 1
+        dist = computeDistance(G, u, d, point, space)
+        if dist > bestD:
+            bestD = dist
+            bestP = point
+    return bestP
+
+
+            
+def optimalPoint(G, u, d, space):
+    guesses = []
+    for i in range(d):
+        C = 0
+        N = 0
+        c = []
+        for v in G.iterNeighbors(u):
+            N += 1
+            C += space[v][i]
+            c.append(space[v][i])
+        guesses.append([0, 1, C / (2*N)])
+    point = optimalGuess(G, u, d, guesses, space)
+        
+    return point
+            
+    
+def embedNodes(G, d):
+    n = G.numberOfNodes()
+    space = []
+    for i in range(n):
+        space.append([random.random() for _ in range(d)])
+    for i in range(n):
+        space[i] = optimalPoint(G, i, d, space)
+    return space
+
+
+def embeddingMatching(G, d):
+    n = G.numberOfNodes()
+    space = embedNodes(G, d)
+    class Point:
+        def __init__(self, point, data):
+            self.coords = point
+            self.data = data
+        def __len__(self):
+            return len(self.coords)
+        def __getitem__(self, i):
+            return self.coords[i]
+        def __repr__(self):
+            return 'Point({}, {})'.format(self.coords, self.data)
+    for i in range(len(space)):
+        space[i] = Point(space[i], i)
+    tree = kd.create(space)
+    matching = set()
+    used = set()
+    R = -1
+    while tree.height() > 1:
+        u = tree.data
+        tree = tree.remove(u)
+        v = tree.search_nn(u)[0]
+        matching.add((v.data.data, u.data))
+        tree = tree.remove(v.data)
+    if tree.height == 1:
+        R = tree.data.data    
+    return matching, R
+    
+    
+
 
 
 def randSampleSolve(G):
@@ -509,7 +606,9 @@ def matchingCoarsening(G,C,GVs=None):
         M, R, F = spectralMatching(G, 2)
     elif C == 1:
         M, R = randomMatching(G)
-    elif GVs != None and GVs != None:
+    elif C == 2:
+        M, R = embeddingMatching(G, 3)
+    elif GVs != None:
         M, R, F = informedMatching(G, 2, GVs)
     for u, v in M:
         mapCoarseToFine[idx] = [u, v]
@@ -681,6 +780,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         fiedler_list.append(coarse[2])
         if calc_density(G) > density_cutoff:
             sG = sparsify(G, density_cutoff)
+            sG = G
         else:
             sG = G
 
@@ -732,7 +832,7 @@ def maxcut_solve(G, C, obj=None, S=None):
                 ct = 0
                 obj = new_obj
         print("\nTOTAL REFINEMENTS: " + str(refinements))
-        print("OBJECTIVE AFTER REFINEMENT: " + str(obj))
+        print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
 
     return calc_obj(problem_graph, solution), solution
@@ -746,14 +846,13 @@ elif gformat == 'elist':
 
 
 
-
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
 max_obj = 0
 S = None
 for i in range(cycles):
-    obj, S = maxcut_solve(G, 0, S)
+    obj, S = maxcut_solve(G, 2, obj=max_obj, S=S)
     if obj > max_obj:
         max_obj = obj
 e = time.perf_counter()
