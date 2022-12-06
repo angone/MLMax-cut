@@ -769,7 +769,7 @@ def maxcut_solve(G, C, obj=None, S=None):
     old = G.numberOfNodes()
     new = 0
     fiedler_list = []
-    while(abs(new - old) > 2*spsize):
+    while(abs(new - old) > spsize):
         old = G.numberOfNodes()
         if old <= 2*(1+spsize):
             break
