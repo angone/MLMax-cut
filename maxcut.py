@@ -42,7 +42,6 @@ fiedler_list =[]
 
 
 if solver == 'qaoa':
-    median, kde = get_median_pre_trained_kde(3)
     from qiskit import BasicAer
     from qiskit.algorithms import QAOA
     import qiskit.aqua.components.optimizers as optimizers
@@ -64,7 +63,7 @@ if solver == 'qaoa':
     from functools import partial
     from QAOAKit.qaoa import get_maxcut_qaoa_circuit
     import operator
-
+    median, kde = get_median_pre_trained_kde(3)
 
 
 
@@ -204,8 +203,9 @@ def embedNodes(G, d):
     space = []
     for i in range(n):
         space.append([random.random() for _ in range(d)])
-    for i in range(n):
-        space[i] = optimalPoint(G, i, d, space)
+    for _ in range(3):
+        for i in range(n):
+            space[i] = optimalPoint(G, i, d, space)
     return space
 
 
@@ -228,14 +228,19 @@ def embeddingMatching(G, d):
     matching = set()
     used = set()
     R = -1
-    while tree.height() > 1:
+    ct = 0
+    T = len(list(tree.inorder()))
+    while T >= 2:
         u = tree.data
         tree = tree.remove(u)
         v = tree.search_nn(u)[0]
         matching.add((v.data.data, u.data))
         tree = tree.remove(v.data)
-    if tree.height == 1:
-        R = tree.data.data    
+        T -= 2
+    if T == 1:
+        R = tree.data.data
+
+    print(matching)
     return matching, R
     
     
@@ -354,7 +359,7 @@ def randGainSubProb(G, sol, sp_size):
 
 
 
-def qaoa(G):
+def qaoa(G, p=3):
     n = G.numberOfNodes()
     mw = 0
     d_w = 0
@@ -809,7 +814,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         solution = new_solution
         obj = calc_obj(fG, solution)
         ct = 0
-
+        print(str(fG))
         while ct < 3:
             res = refine(sG, solution, spsize, obj, method, solver)
             refinements += 1
@@ -852,8 +857,11 @@ s = time.perf_counter()
 max_obj = 0
 S = None
 for i in range(cycles):
-    obj, S = maxcut_solve(G, 2, obj=max_obj, S=S)
+    obj, S = maxcut_solve(G, 0, obj=max_obj, S=S)
     if obj > max_obj:
         max_obj = obj
 e = time.perf_counter()
+
 print("Found maximum value for " + str(gname) + " of " + str(max_obj) + " " + str(e-s) + "s")
+solution = randSampleSolve(G)
+print(calc_obj(G, solution))
