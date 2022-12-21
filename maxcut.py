@@ -13,6 +13,8 @@ import faulthandler
 import sympy as sym
 import baseconvert as bc
 import kdtree as kd
+from scipy.optimize import minimize
+
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -23,11 +25,11 @@ parser.add_argument("-solver", type = str, default = "qbsolv", help = "subproble
 parser.add_argument("-optimizer", type = str, default = "COBYLA", help = "qaoa optimizer")
 parser.add_argument("-gformat", type = str, default = "elist", help = "graph format")
 parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
-
+parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 
 args = parser.parse_args()
 
-
+embed = args.embed
 method = args.method
 gname = args.gname
 spsize = args.spsize
@@ -161,43 +163,20 @@ def computeDistance(G, u, d, point, space):
     return obj
         
         
-def optimalGuess(G, u, d, guesses, space):
-    bestP = []
-    bestD = 0
-    for i in range(3**d):
-        point = []
-        p = bc.base(str(i),10,3,string=True)
-        j = 0
-        while j < len(p):
-            point.append(guesses[j][int(p[j])])
-            j += 1
-        while j < d:
-            point.append(guesses[j][0])
-            j += 1
-        dist = computeDistance(G, u, d, point, space)
-        if dist > bestD:
-            bestD = dist
-            bestP = point
-    return bestP
 
 
-            
-def optimalPoint(G, u, d, space):
-    guesses = []
-    for i in range(d):
-        C = 0
-        N = 0
-        c = []
-        for v in G.iterNeighbors(u):
-            N += 1
-            C += space[v][i]
-            c.append(space[v][i])
-        guesses.append([0, 1, C / (2*N)])
-    point = optimalGuess(G, u, d, guesses, space)
-        
-    return point
-            
-    
+def buildEmbedObj(G, u, d, space):
+    def obj(pos):
+        o = 0
+        for x in G.iterNeighbors(u):
+            temp = 0
+            for i in range(d):
+                temp += (pos[i] - space[x][i])**2
+            o += (np.sqrt(temp)*G.weight(u,x))
+        return -1 * o
+    return obj
+
+                
 def embedNodes(G, d):
     n = G.numberOfNodes()
     space = []
@@ -205,13 +184,20 @@ def embedNodes(G, d):
         space.append([random.random() for _ in range(d)])
     for _ in range(3):
         for i in range(n):
-            space[i] = optimalPoint(G, i, d, space)
+            b = buildEmbedObj(G, i, d, space)
+            bnds = ((0,1),(0,1),(0,1))
+            def sphere(x):
+                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
+            cons = [{'type': 'ineq', 'fun': sphere}]
+            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
+            space[i] = list(res.x)
     return space
 
 
 def embeddingMatching(G, d):
     n = G.numberOfNodes()
     space = embedNodes(G, d)
+    print('nodes embedded')
     class Point:
         def __init__(self, point, data):
             self.coords = point
@@ -240,7 +226,6 @@ def embeddingMatching(G, d):
     if T == 1:
         R = tree.data.data
 
-    print(matching)
     return matching, R
     
     
@@ -780,7 +765,7 @@ def maxcut_solve(G, C, obj=None, S=None):
             break
         coarse= matchingCoarsening(G, C, GVs)    
         G = coarse[0]
-        print(getComponents(G)[2])
+        print(str(G))
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
         if calc_density(G) > density_cutoff:
@@ -857,11 +842,9 @@ s = time.perf_counter()
 max_obj = 0
 S = None
 for i in range(cycles):
-    obj, S = maxcut_solve(G, 0, obj=max_obj, S=S)
+    obj, S = maxcut_solve(G, 2, obj=max_obj, S=S)
     if obj > max_obj:
         max_obj = obj
 e = time.perf_counter()
 
-print("Found maximum value for " + str(gname) + " of " + str(max_obj) + " " + str(e-s) + "s")
-solution = randSampleSolve(G)
-print(calc_obj(G, solution))
+print("Found maximum value for " + str(solver) + " " + str(gname) + " of " + str(max_obj) + " " + str(e-s) + "s")
