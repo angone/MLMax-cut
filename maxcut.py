@@ -15,7 +15,9 @@ import baseconvert as bc
 import kdtree as kd
 from scipy.optimize import minimize
 
+
 faulthandler.enable()
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gname", type = str, default = "None", help = "graph file")
@@ -188,8 +190,11 @@ def embedNodes(G, d):
             bnds = ((0,1),(0,1),(0,1))
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}]
-            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
+            if embed == 'sphere':
+                cons = [{'type': 'ineq', 'fun': sphere}]
+                res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
+            else:
+                res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001)
             space[i] = list(res.x)
     return space
 
@@ -225,7 +230,6 @@ def embeddingMatching(G, d):
         T -= 2
     if T == 1:
         R = tree.data.data
-
     return matching, R
     
     
@@ -288,9 +292,6 @@ def nodeGain(G, sol, u):
             gain -= G.weight(u, x)
     return gain
 
-
-def randLocalSubProb(G, sol, sp_size, F):
-    n = F
 
 
 def randGainSubProb(G, sol, sp_size):
@@ -600,6 +601,7 @@ def matchingCoarsening(G,C,GVs=None):
         M, R = embeddingMatching(G, 3)
     elif GVs != None:
         M, R, F = informedMatching(G, 2, GVs)
+
     for u, v in M:
         mapCoarseToFine[idx] = [u, v]
         mapFineToCoarse[u] = idx
@@ -612,6 +614,7 @@ def matchingCoarsening(G,C,GVs=None):
         mapFineToCoarse[R] = idx
         if GVs != None:
             newGVs[idx] = GVs[R]
+        idx += 1
     cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
     for u,v in G.iterEdges():
         cu = mapFineToCoarse[u]
