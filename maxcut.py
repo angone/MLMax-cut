@@ -14,6 +14,9 @@ import sympy as sym
 import baseconvert as bc
 import kdtree as kd
 from scipy.optimize import minimize
+import pyflann as fnn
+
+
 
 faulthandler.enable()
 
@@ -27,8 +30,8 @@ parser.add_argument("-gformat", type = str, default = "elist", help = "graph for
 parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 
-args = parser.parse_args()
-
+args = parser.parse_known_args()
+print(args)
 embed = args.embed
 method = args.method
 gname = args.gname
@@ -189,7 +192,7 @@ def embedNodes(G, d):
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}]
-            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
+            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=None)
             space[i] = list(res.x)
     return space
 
@@ -198,18 +201,17 @@ def embeddingMatching(G, d):
     n = G.numberOfNodes()
     space = embedNodes(G, d)
     print('nodes embedded')
-    class Point:
-        def __init__(self, point, data):
-            self.coords = point
-            self.data = data
-        def __len__(self):
-            return len(self.coords)
-        def __getitem__(self, i):
-            return self.coords[i]
-        def __repr__(self):
-            return 'Point({}, {})'.format(self.coords, self.data)
+
+    used = {}
+    hidx = {}
+    test = space.copy()
+    flann = fnn.FLANN()
+    result = flann.nn(space, test, 10)
+    print(result)
+    exit()
     for i in range(len(space)):
-        space[i] = Point(space[i], i)
+        used[space[i]] = Point(space[i], i)
+        hidx[space[i]]
     tree = kd.create(space)
     matching = set()
     used = set()
@@ -612,6 +614,7 @@ def matchingCoarsening(G,C,GVs=None):
         mapFineToCoarse[R] = idx
         if GVs != None:
             newGVs[idx] = GVs[R]
+        idx += 1
     cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
     for u,v in G.iterEdges():
         cu = mapFineToCoarse[u]
@@ -664,6 +667,38 @@ def getComponents(G):
         idx += 1
     return components, componentMap, idx
             
+
+def sparsifyEffRes(G, q):
+    edges = []
+    prob = []
+    Gcopy = nw.graph.Graph(n=G.numberOfNodes(),weighted=False,directed=False)
+    for u,v in G.iterEdges():
+        Gcopy.addEdge(u,v)
+    C = nw.centrality.ApproxElectricalCloseness(Gcopy,eps=0.1,kappa=0.3)
+    C.run()
+    E = C.getDiagonal()
+    
+    print('computing ER')
+    for u,v in G.iterEdges():
+        edges.append((u,v))
+        ER = abs(E[u] - E[v])
+        p = G.weight(u,v)*ER
+        prob.append(p)
+    print('Finished')
+    print('sampling')
+    idxs = [i for i in range(len(prob))]
+    H = nw.graph.Graph(n=G.numberOfNodes(), weighted = True, directed = False)
+    choices = random.choices(idxs, weights=prob, k=q)
+    for j in choices:
+        u = edges[j][0]
+        v = edges[j][1]
+        w = G.weight(u,v)/(q*prob[j])
+        H.increaseWeight(u, v, w)
+    print('finished')
+    return H
+
+
+
 
 
 def sparsify(G, ratio):
@@ -749,7 +784,7 @@ def maxcut_solve(G, C, obj=None, S=None):
     density_cutoff = calc_density(G)
     density = density_cutoff
     if density > 0.4:
-        sG = sparsify(G, 0.4)
+        sG = sparsifyEffRes(G, int(0.4 * (n * (n-1)/2)))
         density_cutoff = calc_density(G)
         density = density_cutoff
     else:
@@ -769,8 +804,8 @@ def maxcut_solve(G, C, obj=None, S=None):
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
         if calc_density(G) > density_cutoff:
-            sG = sparsify(G, density_cutoff)
-            sG = G
+            n = G.numberOfNodes()
+            sG = sparsifyEffRes(G, int(density_cutoff * (n * (n-1)/2)))
         else:
             sG = G
 
@@ -833,7 +868,6 @@ if gformat == 'alist':
     G = readGraph()
 elif gformat == 'elist':
     G = readGraphEList()
-
 
 
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
