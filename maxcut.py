@@ -14,8 +14,8 @@ import sympy as sym
 import baseconvert as bc
 import kdtree as kd
 from scipy.optimize import minimize
-import pyflann as fnn
-
+import pynndescent
+from sklearn.neighbors import KDTree
 
 
 faulthandler.enable()
@@ -30,7 +30,7 @@ parser.add_argument("-gformat", type = str, default = "elist", help = "graph for
 parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 
-args = parser.parse_known_args()
+args = parser.parse_args()
 print(args)
 embed = args.embed
 method = args.method
@@ -199,35 +199,35 @@ def embedNodes(G, d):
 
 def embeddingMatching(G, d):
     n = G.numberOfNodes()
-    space = embedNodes(G, d)
-    print('nodes embedded')
+    space = np.array(embedNodes(G, d))
+    
+    tree = KDTree(space)
+    point, ind = tree.query(space, k=n)
 
-    used = {}
-    hidx = {}
-    test = space.copy()
-    flann = fnn.FLANN()
-    result = flann.nn(space, test, 10)
-    print(result)
-    exit()
-    for i in range(len(space)):
-        used[space[i]] = Point(space[i], i)
-        hidx[space[i]]
-    tree = kd.create(space)
     matching = set()
     used = set()
     R = -1
     ct = 0
-    T = len(list(tree.inorder()))
-    while T >= 2:
-        u = tree.data
-        tree = tree.remove(u)
-        v = tree.search_nn(u)[0]
-        matching.add((v.data.data, u.data))
-        tree = tree.remove(v.data)
-        T -= 2
-    if T == 1:
-        R = tree.data.data
+    if n % 2 == 1:
+        R = random.randint(0,n-1)
+        ct = 1
 
+    for i in range(n):
+        if i in used or i == R:
+            continue
+        for x in ind[i]:
+            if x not in used:
+                used.add(i)
+                used.add(x)
+                matching.add((i, x))
+                ct += 2
+                break
+
+    print(ct)
+        
+
+    print(len(matching))
+    print(R)
     return matching, R
     
     
@@ -674,7 +674,8 @@ def sparsifyEffRes(G, q):
     Gcopy = nw.graph.Graph(n=G.numberOfNodes(),weighted=False,directed=False)
     for u,v in G.iterEdges():
         Gcopy.addEdge(u,v)
-    C = nw.centrality.ApproxElectricalCloseness(Gcopy,eps=0.1,kappa=0.3)
+    print(Gcopy)
+    C = nw.centrality.ApproxElectricalCloseness(Gcopy)
     C.run()
     E = C.getDiagonal()
     
