@@ -10,11 +10,7 @@ import pyomo.environ as pyo
 import scipy
 from queue import Queue
 import faulthandler
-import sympy as sym
-import baseconvert as bc
-import kdtree as kd
 from scipy.optimize import minimize
-import pynndescent
 from sklearn.neighbors import KDTree
 
 
@@ -22,26 +18,23 @@ faulthandler.enable()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gname", type = str, default = "None", help = "graph file")
-parser.add_argument("-method", type = str, default = "None", help = "refinement method")
 parser.add_argument("-spsize", type = int, default = 18, help = "size of subproblems")
-parser.add_argument("-solver", type = str, default = "qbsolv", help = "subproblem solver")
+parser.add_argument("-solver", type = str, default = "gurobi", help = "subproblem solver")
 parser.add_argument("-optimizer", type = str, default = "COBYLA", help = "qaoa optimizer")
 parser.add_argument("-gformat", type = str, default = "elist", help = "graph format")
 parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
+parser.add_argument("-coarseonly", type = int, default = 0)
 
 args = parser.parse_args()
-print(args)
 embed = args.embed
-method = args.method
 gname = args.gname
 spsize = args.spsize
 solver = args.solver
 optimizer = args.optimizer
 gformat = args.gformat
 cycles = args.cycles
-
-
+coarseonly = args.coarseonly
 
 fiedler_list =[]
 
@@ -149,22 +142,7 @@ def pyomo(G, solver):
             solution[i] = 0
         else:
             solution[i] = 1
-    return solution
-
-
-
-
-
-
-def computeDistance(G, u, d, point, space):
-    obj = 0
-    for v in G.iterNeighbors(u):
-        a = 0
-        for i in range(d):
-            a += (point[i] - space[v][i])**2
-        obj += np.sqrt(a)
-    return obj
-        
+    return solution        
         
 
 
@@ -191,8 +169,8 @@ def embedNodes(G, d):
             bnds = ((0,1),(0,1),(0,1))
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}]
-            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=None)
+            cons = [{'type': 'ineq', 'fun': sphere}] if embed == 'sphere' else None
+            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
             space[i] = list(res.x)
     return space
 
@@ -202,32 +180,66 @@ def embeddingMatching(G, d):
     space = np.array(embedNodes(G, d))
     
     tree = KDTree(space)
-    point, ind = tree.query(space, k=n)
-
+    ind = tree.query_radius(space, 0)
     matching = set()
     used = set()
-    R = -1
-    ct = 0
-    if n % 2 == 1:
-        R = random.randint(0,n-1)
-        ct = 1
-
-    for i in range(n):
-        if i in used or i == R:
+    clusters = []
+    singletons = []
+    t = 0
+    for x in ind:
+        if x[0] in used:
             continue
-        for x in ind[i]:
-            if x not in used:
-                used.add(i)
-                used.add(x)
-                matching.add((i, x))
-                ct += 2
-                break
+        elif len(x) == 1:
+            singletons.append(x[0])
+        else:
+            clusters.append(x)
+            for y in x:
+                used.add(y)
+            t += len(x)
+    
+    for c in clusters:
+        k = len(c)
+        if k % 2 == 1:
+            k = k - 1
+            singletons.append(c[k])
+            if c[k] in used:
+                used.remove(c[k])
+        for i in range(int(k/2)):
+            matching.add((c[2*i], c[2*i + 1]))
 
-    print(ct)
+    indices = []
+    newspace = []
+    R = -1
+    k = len(singletons)
+    if k % 2 == 1:
+        k = k-1
+        R = singletons[k]
+    for i in range(k):
+        x = singletons[i]
+        indices.append(x)
+        newspace.append(space[x])
+    tree = KDTree(newspace)
+    ind = tree.query(newspace,k=min(40,k),return_distance=False)
+    
+    unused = []
+    for i in range(len(ind)):
+        idx = indices[i]
+        if idx not in used:
+            for j in ind[i]:
+                jdx = indices[j]
+                if jdx not in used and idx != jdx:
+                   matching.add((idx, jdx))
+                   used.add(idx)
+                   used.add(jdx)
+                   break
+    for i in range(n):
+        if i not in used:
+            unused.append(i)
+    m = len(unused)
+    
+    for i in range(int(m/2)):
+        matching.add((unused[2*i], unused[2*i + 1]))
         
-
-    print(len(matching))
-    print(R)
     return matching, R
     
     
@@ -388,7 +400,7 @@ def qaoa(G, p=3):
     return res
 
 
-def refine(G, sol, sp_size, obj, rmethod, spsolver, sp=None):
+def refine(G, sol, sp_size, obj, spsolver, sp=None):
     if sp != None:
         subprob = sp
     else:
@@ -837,7 +849,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         ct = 0
         print(str(fG))
         while ct < 3:
-            res = refine(sG, solution, spsize, obj, method, solver)
+            res = refine(sG, solution, spsize, obj, solver)
             refinements += 1
             solution = res[0]
             new_obj = res[1]
@@ -848,7 +860,7 @@ def maxcut_solve(G, C, obj=None, S=None):
                 obj = new_obj
         ct = 0
         while ct < 5:
-            res = refine(fG, solution, spsize, obj, method, solver)                
+            res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
             solution = res[0]
             new_obj = res[1]
@@ -860,7 +872,8 @@ def maxcut_solve(G, C, obj=None, S=None):
         print("\nTOTAL REFINEMENTS: " + str(refinements))
         print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
-
+        if coarseonly == 1:
+            exit()
     return calc_obj(problem_graph, solution), solution
 
 
