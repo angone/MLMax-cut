@@ -1,5 +1,4 @@
 import networkit as nw
-from dwave_qbsolv import QBSolv
 import random
 from datetime import datetime
 import argparse
@@ -214,6 +213,10 @@ def embeddingMatching(G, d):
     if k % 2 == 1:
         k = k-1
         R = singletons[k]
+        used.add(R)
+    if k == 0:
+        return matching, R
+    print(k)
     for i in range(k):
         x = singletons[i]
         indices.append(x)
@@ -239,7 +242,9 @@ def embeddingMatching(G, d):
     
     for i in range(int(m/2)):
         matching.add((unused[2*i], unused[2*i + 1]))
-        
+    #print(matching)
+    print(len(matching))
+    print(R)
     return matching, R
     
     
@@ -691,14 +696,11 @@ def sparsifyEffRes(G, q):
     C.run()
     E = C.getDiagonal()
     
-    print('computing ER')
     for u,v in G.iterEdges():
         edges.append((u,v))
         ER = abs(E[u] - E[v])
         p = G.weight(u,v)*ER
         prob.append(p)
-    print('Finished')
-    print('sampling')
     idxs = [i for i in range(len(prob))]
     H = nw.graph.Graph(n=G.numberOfNodes(), weighted = True, directed = False)
     choices = random.choices(idxs, weights=prob, k=q)
@@ -707,7 +709,6 @@ def sparsifyEffRes(G, q):
         v = edges[j][1]
         w = G.weight(u,v)/(q*prob[j])
         H.increaseWeight(u, v, w)
-    print('finished')
     return H
 
 
@@ -852,7 +853,7 @@ def maxcut_solve(G, C, obj=None, S=None):
             res = refine(sG, solution, spsize, obj, solver)
             refinements += 1
             solution = res[0]
-            new_obj = res[1]
+            new_obj = calc_obj(fG, solution)
             if new_obj <= obj:
                 ct += 1
             else:
