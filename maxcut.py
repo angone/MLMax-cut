@@ -11,8 +11,11 @@ from queue import Queue
 import faulthandler
 from scipy.optimize import minimize
 from sklearn.neighbors import KDTree
+from sortedcontainers import SortedKeyList
+from node2vec import Node2Vec
+import logging
 
-
+logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -24,7 +27,7 @@ parser.add_argument("-gformat", type = str, default = "elist", help = "graph for
 parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycles")
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-coarseonly", type = int, default = 0)
-
+parser.add_argument("-sfile", type = str, default = None)
 args = parser.parse_args()
 embed = args.embed
 gname = args.gname
@@ -34,8 +37,14 @@ optimizer = args.optimizer
 gformat = args.gformat
 cycles = args.cycles
 coarseonly = args.coarseonly
-
+sfile = args.sfile
 fiedler_list =[]
+gainmap = {}
+gainlist = None
+change = set()
+n2vm = None
+subset = None
+last_idx = 0
 
 
 if solver == 'qaoa':
@@ -104,6 +113,12 @@ def readGraphEList():
     G.removeSelfLoops()
     return G
         
+
+    
+
+
+
+
 def get_exact_energy(G, p):
     obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
     precomputed_energies = precompute_energies(obj, G.number_of_nodes())
@@ -118,10 +133,10 @@ def get_exact_energy(G, p):
 def pyomo(G, solver):
     if solver == "gurobi":
         opt = pyo.SolverFactory('gurobi')
-        opt.options['TimeLimit'] = 5
+        opt.options['TimeLimit'] = 1
     elif solver == "ipopt":
         opt = pyo.SolverFactory('ipopt')
-        opt.options['max_cpu_time'] = 5
+        opt.options['max_cpu_time'] = 1
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
@@ -156,7 +171,9 @@ def buildEmbedObj(G, u, d, space):
         return -1 * o
     return obj
 
-                
+
+
+
 def embedNodes(G, d):
     n = G.numberOfNodes()
     space = []
@@ -165,12 +182,13 @@ def embedNodes(G, d):
     for _ in range(3):
         for i in range(n):
             b = buildEmbedObj(G, i, d, space)
-            bnds = ((0,1),(0,1),(0,1))
-            def sphere(x):
-                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}] if embed == 'sphere' else None
-            res = minimize(b, (0.5, 0.5, 0.5), bounds=bnds, tol=0.00001, constraints=cons)
-            space[i] = list(res.x)
+            bnds = ((0,1) for _ in range(d))
+            p = [random.random() for _ in range(d)]
+        def sphere(x):
+            return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
+        cons = [{'type': 'ineq', 'fun': sphere}] if embed == 'sphere' else None
+        res = minimize(b, p, bounds=bnds, tol=0.00001, constraints=cons)
+        space[i] = list(res.x)
     return space
 
 
@@ -216,7 +234,6 @@ def embeddingMatching(G, d):
         used.add(R)
     if k == 0:
         return matching, R
-    print(k)
     for i in range(k):
         x = singletons[i]
         indices.append(x)
@@ -242,9 +259,7 @@ def embeddingMatching(G, d):
     
     for i in range(int(m/2)):
         matching.add((unused[2*i], unused[2*i + 1]))
-    #print(matching)
-    print(len(matching))
-    print(R)
+
     return matching, R
     
     
@@ -298,40 +313,109 @@ def calc_obj(G, solution):
     return -1 * obj
 
 
-def nodeGain(G, sol, u):
-    gain = 0
-    for x in G.iterNeighbors(u):
-        if sol[x] == sol[u]:
-            gain += G.weight(u, x)
+
+
+def key(v):
+    return -1*gainmap[v]
+
+def updateGain(G, new_sol, old_sol):
+    global gainmap
+    global gainlist
+    global change
+    for u in change:
+        if new_sol[u] != old_sol[u]:
+            gainlist.remove(u)
+            gainmap[u] = 0
+            for v, w in G.iterNeighborsWeights(u):
+                if new_sol[u] == new_sol[v]:
+                    gainmap[u] += w
+                else:
+                    gainmap[u] -= w
+                if v not in change:
+                    gainlist.remove(v)
+                    if new_sol[u] == new_sol[v]:
+                        gainmap[v] += w
+                    else:
+                        gainmap[v] -= w
+                    gainlist.add(v)
+            gainlist.add(u)
+                    
+def buildGain(G, sol):
+    global gainmap
+    global gainlist
+    for i in range(G.numberOfNodes()):
+        gainmap[i] = 0
+    for u,v,w in G.iterEdgesWeights():
+        if sol[u] == sol[v]:
+            gainmap[u] += w
+            gainmap[v] += w
         else:
-            gain -= G.weight(u, x)
-    return gain
+            gainmap[u] -= w
+            gainmap[v] -= w
+
+    gainlist = SortedKeyList([i for i in range(G.numberOfNodes())],key=key)
 
 
-def randLocalSubProb(G, sol, sp_size, F):
-    n = F
+
+def randomWalk(E, p, u):
+    near = E.most_similar(str(u))
+    v = int(near[random.randint(0,len(near)-1)][0])
+    if random.random() < p:
+        return randomWalk(E, p/2, v)
+    return u
+    
+def n2v(G, sol, sp_size, S):
+    global gainlist
+    global n2vm
+    global last_idx
+    n = G.numberOfNodes()
+
+    E = n2vm
+    V = set()
+    spnodes = []
+    
+        
+    while len(V) < sp_size:        
+        u = gainlist[last_idx]
+        if u not in V and u in S:
+            V.add(u)
+            near = E.most_similar(str(u))
+            for x in near:
+                X = randomWalk(E, 0.5, int(x[0]))
+                if len(V) > sp_size:
+                    break
+                
+                elif X not in V and x in S:
+                    V.add(int(X))
+        last_idx = (last_idx + 1) % len(gainlist)
+    for u in V:
+        spnodes.append(u)
+
+    return spnodes
+
+
 
 
 def randGainSubProb(G, sol, sp_size):
+    global gainmap
+    global gainlist
+    global change
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
-    sampleSize = 10 * sp_size
-    sample = [x for x in range(G.numberOfNodes())]
-    random.shuffle(sample)
-    sample = sample[:sampleSize]
-    gain = []
-    for x in sample:
-        gain.append((nodeGain(G, sol, x), x))
-        
-    gain = sorted(gain)
-    gain.reverse()
+    
+    l = [i for i in range(G.numberOfNodes())]
+#    S = random.sample(l,min(sp_size*10,G.numberOfNodes()))
+    S = l
+
+    gain = n2v(G,sol,sp_size, S)
 
     mapProbToSubProb = {}
-    totalGain = 0
     ct =0
     i = 0
     idx =0
+    change = set()
     while i < sp_size:
-        u = gain[i][1]
+        u = gain[i]
+        change.add(u)
         mapProbToSubProb[u] = idx
         idx += 1
         i += 1
@@ -342,7 +426,7 @@ def randGainSubProb(G, sol, sp_size):
     total = 0
     j = 0
     while j < sp_size:
-        u = gain[j][1]
+        u = gain[j]
         spu = mapProbToSubProb[u]
         for v, w in G.iterNeighborsWeights(u):
             if v not in keys:
@@ -444,7 +528,10 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None):
             else:
                 new_sol[i] = solution[idx+1]
     new_obj = calc_obj(G, new_sol)
-
+    changes = []
+    for i in range(n):
+        if sol[i] != new_sol[i]:
+            changes.append(i)
     if new_obj > obj:
         return (new_sol, new_obj, subprob)
 
@@ -783,6 +870,8 @@ def calc_density(G):
 
 def maxcut_solve(G, C, obj=None, S=None):
     global fiedler_list
+    global last_idx
+    global n2vm
     refinements = 0
     print(gname)
     print(str(G))
@@ -806,11 +895,11 @@ def maxcut_solve(G, C, obj=None, S=None):
     hierarchy = [(G,sG)]
     hierarchy_map = []
     old = G.numberOfNodes()
-    new = 0
+    new = G.numberOfNodes()
     fiedler_list = []
-    while(abs(new - old) > spsize):
+    while(True):
         old = G.numberOfNodes()
-        if old <= 2*(1+spsize):
+        if new < spsize:
             break
         coarse= matchingCoarsening(G, C, GVs)    
         G = coarse[0]
@@ -847,44 +936,90 @@ def maxcut_solve(G, C, obj=None, S=None):
                 new_solution[x] = solution[j]
         solution = new_solution
         obj = calc_obj(fG, solution)
+        buildGain(fG, solution)
+        print('built gain')
         ct = 0
         print(str(fG))
+        nxG = nw.nxadapter.nk2nx(sG)
+        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
+        n2vm = n2v.fit(window=10,min_count=1).wv
         while ct < 3:
             res = refine(sG, solution, spsize, obj, solver)
             refinements += 1
+            updateGain(fG, res[0], solution)
             solution = res[0]
             new_obj = calc_obj(fG, solution)
+            
             if new_obj <= obj:
                 ct += 1
             else:
                 ct = 0
+                last_idx = 0
                 obj = new_obj
         ct = 0
+        nxG = nw.nxadapter.nk2nx(fG)
+        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10,quiet=True)
+        n2vm = n2v.fit(window=10,min_count=1).wv
         while ct < 5:
             res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
+            updateGain(fG, res[0], solution)
             solution = res[0]
             new_obj = res[1]
             if new_obj <= obj:
                 ct += 1
             else:
                 ct = 0
+                last_idx = 0
                 obj = new_obj
         print("\nTOTAL REFINEMENTS: " + str(refinements))
         print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
         if coarseonly == 1:
-            exit()
+            return calc_obj(problem_graph, solution), solution
     return calc_obj(problem_graph, solution), solution
 
+
+
+
+def readMQLib(f):
+    f = open(f, 'r')
+    f.readline()
+    f.readline()
+    f.readline()
+    l = f.readline().split()
+    print(l)
+    sol = {}
+    for i in range(len(l)):
+        if l[i] == '-1':
+            sol[i] = 0
+        elif l[i] == '1':
+            sol[i] = 1
+    return sol
 
 
 if gformat == 'alist':
     G = readGraph()
 elif gformat == 'elist':
     G = readGraphEList()
-
-
+if sfile != None:
+    print(sfile)
+    sol = readMQLib(sfile)
+    print(sol)
+    obj = calc_obj(G,sol)
+    og_obj = obj
+    print(obj)
+    for _ in range(300):
+        s, o, _ =refine(G, sol, 98, calc_obj(G,sol), 'gurobi')
+        if o > obj:
+            sol = s
+            obj = o
+    print(obj)
+    if og_obj == obj:
+        print('NOT IMPROVED')
+    else:
+        print('IMPROVED')
+    exit()
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
@@ -895,5 +1030,7 @@ for i in range(cycles):
     if obj > max_obj:
         max_obj = obj
 e = time.perf_counter()
-
+f = open(gname + '.sol', 'w')
+f.write(str(S))
+f.close()
 print("Found maximum value for " + str(solver) + " " + str(gname) + " of " + str(max_obj) + " " + str(e-s) + "s")
