@@ -28,7 +28,15 @@ parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycl
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-coarseonly", type = int, default = 0)
 parser.add_argument("-sfile", type = str, default = None)
+parser.add_argument("-sparsify", type = int, default = 0)
+parser.add_argument("-testsubprob", type = int, default = 0)
+parser.add_argument("-ads", type = int, default = 0)
+parser.add_argument("-eratio", type = float, default = 0.1)
 args = parser.parse_args()
+ads = args.ads
+eratio = args.eratio
+sparse_out = args.sparsify
+testsubprob = args.testsubprob
 embed = args.embed
 gname = args.gname
 spsize = args.spsize
@@ -94,7 +102,7 @@ def readGraph():
 
 
 def readGraphEList():
-    f = open(gname, "r")
+    f = open("graphs/bigset/" + gname, "r")
     line = f.readline().split()
     n = int(line[0])
     G = nw.graph.Graph(n=n, weighted=True, directed = False)
@@ -192,10 +200,22 @@ def embedNodes(G, d):
     return space
 
 
+
+def embedDist(u, v, space, d):
+    a = 0
+    for i in range(d):
+        a += (space[u][i] - space[v][i])**2
+    return np.sqrt(a)
+
 def embeddingMatching(G, d):
     n = G.numberOfNodes()
     space = np.array(embedNodes(G, d))
-    
+    sortedEdges = []
+    for u, v, w in G.iterEdgesWeights():
+        sortedEdges.append((embedDist(u,v,space,d),(u,v,w)))
+    sortedEdges.sort()
+    if ads == 1:
+        return 0, 0, sortedEdges
     tree = KDTree(space)
     ind = tree.query_radius(space, 0)
     matching = set()
@@ -259,8 +279,8 @@ def embeddingMatching(G, d):
     
     for i in range(int(m/2)):
         matching.add((unused[2*i], unused[2*i + 1]))
-
-    return matching, R
+   
+    return matching, R, sortedEdges
     
     
 
@@ -394,9 +414,58 @@ def n2v(G, sol, sp_size, S):
     return spnodes
 
 
-
-
 def randGainSubProb(G, sol, sp_size):
+    global gainmap
+    global gainlist
+    global change
+    subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
+    
+    l = [i for i in range(G.numberOfNodes())]
+    S = l
+
+    gain = gainlist[:sp_size]
+
+    mapProbToSubProb = {}
+    ct =0
+    i = 0
+    idx =0
+    change = set()
+    while i < sp_size:
+        u = gain[i]
+        change.add(u)
+        mapProbToSubProb[u] = idx
+        idx += 1
+        i += 1
+
+
+
+    keys = mapProbToSubProb.keys()
+    total = 0
+    j = 0
+    while j < sp_size:
+        u = gain[j]
+        spu = mapProbToSubProb[u]
+        for v, w in G.iterNeighborsWeights(u):
+            if v not in keys:
+                if sol[v] == 0:
+                    spv = idx
+                else:
+                    spv = idx + 1
+                subprob.increaseWeight(spu, spv, w)
+            else:
+                spv = mapProbToSubProb[v]
+                if u < v:
+                    subprob.increaseWeight(spu, spv, w)
+            total += w
+        j += 1
+
+    subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
+    return (subprob, mapProbToSubProb, idx)
+
+
+
+
+def embedGainSubProb(G, sol, sp_size):
     global gainmap
     global gainlist
     global change
@@ -489,11 +558,13 @@ def qaoa(G, p=3):
     return res
 
 
-def refine(G, sol, sp_size, obj, spsolver, sp=None):
+def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
     if sp != None:
         subprob = sp
-    else:
+    elif m == 1:
         subprob = randGainSubProb(G, sol, sp_size)
+    else:
+        subprob = embedGainSubProb(G, sol, sp_size)
 
     idx = subprob[2]
     mapProbToSubProb = subprob[1]
@@ -726,8 +797,13 @@ def matchingCoarsening(G,C,GVs=None):
         cG.increaseWeight(cu, cv, G.weight(u, v))
     cG.removeSelfLoops()
     cG.indexEdges()
-    C = getComponents(cG)
-
+    C, _, _ = getComponents(cG)
+    nC = len(C)
+    print(nC)
+    if nC > 1:
+        print(C[0][0],C[1][0])
+        for i in range(1, nC):
+            cG.addEdge(C[0][0], C[i][0], w=0.001)
     newS = []
     if GVs != None:
         for i in range(idx):
@@ -756,12 +832,12 @@ def getComponents(G):
     mns = 0
     while mns < G.numberOfNodes():
         q.put(mns)
-        components[idx] = set()
+        components[idx] = []
         while not q.empty():
             u = q.get()
             if componentMap.get(u) == None:
                 componentMap[u] = idx
-                components[idx].add(u)
+                components[idx].append(u)
                 for v in G.iterNeighbors(u):
                     q.put(v)
         for i in range(mns, G.numberOfNodes()+1):
@@ -771,35 +847,43 @@ def getComponents(G):
         idx += 1
     return components, componentMap, idx
             
-
-def sparsifyEffRes(G, q):
-    edges = []
-    prob = []
-    Gcopy = nw.graph.Graph(n=G.numberOfNodes(),weighted=False,directed=False)
-    for u,v in G.iterEdges():
-        Gcopy.addEdge(u,v)
-    print(Gcopy)
-    C = nw.centrality.ApproxElectricalCloseness(Gcopy)
-    C.run()
-    E = C.getDiagonal()
-    
-    for u,v in G.iterEdges():
-        edges.append((u,v))
-        ER = abs(E[u] - E[v])
-        p = G.weight(u,v)*ER
-        prob.append(p)
-    idxs = [i for i in range(len(prob))]
-    H = nw.graph.Graph(n=G.numberOfNodes(), weighted = True, directed = False)
-    choices = random.choices(idxs, weights=prob, k=q)
-    for j in choices:
-        u = edges[j][0]
-        v = edges[j][1]
-        w = G.weight(u,v)/(q*prob[j])
-        H.increaseWeight(u, v, w)
-    return H
-
-
-
+def sparsifyEmbedding(G, ratio, sortedEdges):
+    n = G.numberOfNodes()
+    m = G.numberOfEdges()
+    e_goal = int(ratio*m)
+    e_del = 0
+    deletedEdges = set()
+    for i in range(len(sortedEdges)):
+        if e_del < e_goal:
+            deletedEdges.add(sortedEdges[i][1])
+            e_del += 1
+        else:
+            break
+    nG = nw.graph.Graph(n=G.numberOfNodes(), directed=False,weighted=True)
+    for u,v,w in G.iterEdgesWeights():
+        nG.setWeight(u,v,w)
+        
+    for e in deletedEdges:
+        if e[2] != 0:
+            nG.removeEdge(e[0],e[1])
+    C = getComponents(nG)
+    if C[2] != 1:
+        for e in deletedEdges:
+            u = e[0]
+            v = e[1]
+            w = e[2]
+            cu = C[1][u]
+            cv = C[1][v]
+            c = C[0]
+            if cu != cv:
+                nG.setWeight(u,v,w)
+                for i in c[cv]:
+                    c[cu].append(i)
+                    C[1][i] = cu
+                c[cv] = None
+            elif random.randint(0,100) < 3:
+                nG.setWeight(u,v,w)
+    return nG
 
 
 def sparsify(G, ratio):
@@ -807,11 +891,8 @@ def sparsify(G, ratio):
     m = G.numberOfEdges()
 
     deletedEdges = set()
-    total = (n*(n-1))
+    e_goal = int(ratio*m)
     e_del = 0
-    e_goal = m - int(ratio*total)
-    if e_goal <= 0:
-        return G
     nodeQueue = Queue(maxsize = 0)
     nodeQueue.put(random.randint(0, n-1))
     rc = 0
@@ -851,7 +932,7 @@ def sparsify(G, ratio):
             if cu != cv:
                 nG.setWeight(u,v,w)
                 for i in c[cv]:
-                    c[cu].add(i)
+                    c[cu].append(i)
                     C[1][i] = cu
                 c[cv] = None
             elif random.randint(0,100) < 3:
@@ -883,11 +964,11 @@ def maxcut_solve(G, C, obj=None, S=None):
             GVs[i] = (1,1) if S[i] == 1 else (0,1)
     start = time.perf_counter()
     problem_graph = G
-    
+    n = G.numberOfNodes()
     density_cutoff = calc_density(G)
     density = density_cutoff
-    if density > 0.4:
-        sG = sparsifyEffRes(G, int(0.4 * (n * (n-1)/2)))
+    if density > 0.05 and G.numberOfNodes() > 100:
+        sG = sparsifyEffRes(G, int(0.05 * (n * (n-1)/2))*10)
         density_cutoff = calc_density(G)
         density = density_cutoff
     else:
@@ -901,14 +982,13 @@ def maxcut_solve(G, C, obj=None, S=None):
         old = G.numberOfNodes()
         if new < spsize:
             break
-        coarse= matchingCoarsening(G, C, GVs)    
+        coarse= matchingCoarsening(sG, C, GVs)    
         G = coarse[0]
-        print(str(G))
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
-        if calc_density(G) > density_cutoff:
+        if calc_density(G) > density_cutoff and G.numberOfNodes() > 100:
             n = G.numberOfNodes()
-            sG = sparsifyEffRes(G, int(density_cutoff * (n * (n-1)/2)))
+            sG = sparsifyEffRes(G, int(density_cutoff * (n * (n-1)/2))*10)
         else:
             sG = G
 
@@ -997,29 +1077,143 @@ def readMQLib(f):
             sol[i] = 1
     return sol
 
+def printSparse(G):
+    n = G.numberOfNodes()
+    H = sparsify(G, 0.1)
+    f = open("FF" + str(gname) + '.sparse', "w")
+    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
+    for u, v, w in H.iterEdgesWeights():
+        if u > v:
+            t = v
+            v = u
+            u = v
+        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
+    f.close()
+        
+
+def testSPSelection(G):
+    global n2vm
+    solution = randInitialSolution(G)
+    obj = calc_obj(G, solution)
+    buildGain(G, solution)
+    print(gname)
+    ct = 0
+    print("random gain")
+    for i in range(251):
+        if ct > 20:
+            print('no more improvement')
+            break
+        res = refine(G, solution, spsize, obj, solver, m=1)                
+        updateGain(G, res[0], solution)
+        solution = res[0]
+        new_obj = res[1]
+        if new_obj > obj:
+            obj = new_obj
+            ct = 0
+        else:
+            ct += 1
+        if i % 50 == 0:
+            print(str(i) + ": " + str(new_obj))
+    print("FINAL: " + str(obj))
+    obj = 0
+    ct = 0
+    solution = randInitialSolution(G)
+    print("embed gain")
+    nxG = nw.nxadapter.nk2nx(G)
+    n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
+    n2vm = n2v.fit(window=10,min_count=1).wv
+    for i in range(251):
+        if ct > 20:
+            print('no more improvement')
+            break
+        res = refine(G, solution, spsize, obj, solver, m=0)                
+        updateGain(G, res[0], solution)
+        solution = res[0]
+        new_obj = res[1]
+        if new_obj > obj:
+            obj = new_obj
+            ct = 0
+        else:
+            ct += 1
+        if i % 50 == 0:
+            print(str(i) + ": " + str(new_obj))
+    print("FINAL: " + str(obj))
+    print('mixed gain')
+    obj = 0
+    solution = randInitialSolution(G)
+    ct = 0
+    M = 1
+    for i in range(251):
+        if ct > 5:
+            M = 0
+            ct = 0
+        if ct > 20:
+            print('no more improvement')
+            break
+        res = refine(G, solution, spsize, obj, solver, m=M)
+        updateGain(G, res[0], solution)
+        solution = res[0]
+        new_obj = res[1]
+        if new_obj > obj:
+            obj = new_obj
+            ct = 0
+        else:
+            ct += 1
+        if i % 50 == 0:
+            print(str(i) + ": " + str(new_obj))
+    print("FINAL: " + str(obj))
 
 if gformat == 'alist':
     G = readGraph()
 elif gformat == 'elist':
     G = readGraphEList()
-if sfile != None:
-    print(sfile)
-    sol = readMQLib(sfile)
-    print(sol)
-    obj = calc_obj(G,sol)
-    og_obj = obj
-    print(obj)
-    for _ in range(300):
-        s, o, _ =refine(G, sol, 98, calc_obj(G,sol), 'gurobi')
-        if o > obj:
-            sol = s
-            obj = o
-    print(obj)
-    if og_obj == obj:
-        print('NOT IMPROVED')
-    else:
-        print('IMPROVED')
+
+if testsubprob == 1:
+    testSPSelection(G)
     exit()
+
+
+if ads == 1:
+    n = G.numberOfNodes()
+    ADS = nw.sparsification.AlgebraicDistanceSparsifier()
+    s = ADS.scores(G)
+    H = ADS.getSparsifiedGraphOfSize(G, 1 - eratio, s)
+    f = open("ADS" + str(gname) + str(eratio) +'.sparse', "w")
+    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
+    for u, v, w in H.iterEdgesWeights():
+        if u > v:
+            t = v
+            v = u
+            u = v
+        f.write(str(u+1) + " " + str(v+1) + " " + str(w) + "\n")
+    f.close()
+    H = sparsify(G, eratio)
+    f = open("FF" + str(gname) + str(eratio) + '.sparse', "w")
+    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
+    for u, v, w in H.iterEdgesWeights():
+        if u > v:
+            t = v
+            v = u
+            u = v
+        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
+    f.close()
+    _, _, sortedEdges = embeddingMatching(G, 3)
+    H = sparsifyEmbedding(G, eratio, sortedEdges)
+    f = open("EM" + str(gname) + str(eratio) + '.sparse', "w")
+    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
+    for u, v, w in H.iterEdgesWeights():
+        if u > v:
+            t = v
+            v = u
+            u = v
+        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
+    f.close()
+    exit()
+if sparse_out == 1:
+    printSparse(G)
+    exit()
+
+
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
 s = time.perf_counter()
