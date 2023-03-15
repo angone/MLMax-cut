@@ -7,7 +7,7 @@ import numpy as np
 import networkx as nx
 import pyomo.environ as pyo
 import scipy
-from queue import Queue
+from queue import SimpleQueue as Queue
 import faulthandler
 from scipy.optimize import minimize
 from sklearn.neighbors import KDTree
@@ -28,14 +28,12 @@ parser.add_argument("-cycles", type = int, default = 1, help = "number of v-cycl
 parser.add_argument("-embed", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-coarseonly", type = int, default = 0)
 parser.add_argument("-sfile", type = str, default = None)
-parser.add_argument("-sparsify", type = int, default = 0)
+parser.add_argument("-sparse", type = str, default = None)
 parser.add_argument("-testsubprob", type = int, default = 0)
-parser.add_argument("-ads", type = int, default = 0)
 parser.add_argument("-eratio", type = float, default = 0.1)
 args = parser.parse_args()
-ads = args.ads
 eratio = args.eratio
-sparse_out = args.sparsify
+sparsification = args.sparse
 testsubprob = args.testsubprob
 embed = args.embed
 gname = args.gname
@@ -47,13 +45,16 @@ cycles = args.cycles
 coarseonly = args.coarseonly
 sfile = args.sfile
 fiedler_list =[]
-gainmap = {}
+gainmap = []
 gainlist = None
 change = set()
 n2vm = None
 subset = None
 last_idx = 0
-
+sortedEdges = []
+lastembed = None
+threshold = {}
+nodes = []
 
 if solver == 'qaoa':
     from qiskit import BasicAer
@@ -102,7 +103,7 @@ def readGraph():
 
 
 def readGraphEList():
-    f = open("graphs/bigset/" + gname, "r")
+    f = open("graphs/" + gname, "r")
     line = f.readline().split()
     n = int(line[0])
     G = nw.graph.Graph(n=n, weighted=True, directed = False)
@@ -208,14 +209,13 @@ def embedDist(u, v, space, d):
     return np.sqrt(a)
 
 def embeddingMatching(G, d):
+    global sortedEdges
     n = G.numberOfNodes()
     space = np.array(embedNodes(G, d))
     sortedEdges = []
     for u, v, w in G.iterEdgesWeights():
         sortedEdges.append((embedDist(u,v,space,d),(u,v,w)))
     sortedEdges.sort()
-    if ads == 1:
-        return 0, 0, sortedEdges
     tree = KDTree(space)
     ind = tree.query_radius(space, 0)
     matching = set()
@@ -280,7 +280,7 @@ def embeddingMatching(G, d):
     for i in range(int(m/2)):
         matching.add((unused[2*i], unused[2*i + 1]))
    
-    return matching, R, sortedEdges
+    return matching, R
     
     
 
@@ -363,8 +363,9 @@ def updateGain(G, new_sol, old_sol):
 def buildGain(G, sol):
     global gainmap
     global gainlist
+    gainmap = []
     for i in range(G.numberOfNodes()):
-        gainmap[i] = 0
+        gainmap.append(0)
     for u,v,w in G.iterEdgesWeights():
         if sol[u] == sol[v]:
             gainmap[u] += w
@@ -412,6 +413,83 @@ def n2v(G, sol, sp_size, S):
         spnodes.append(u)
 
     return spnodes
+
+
+
+def SOCSubProb(G, sol, sp_size):
+    global gainmap
+    global nodes
+    if len(nodes) != G.numberOfNodes():
+        nodes = [i for i in range(G.numberOfNodes())]
+    sandpile = {}
+    spnodes = []
+    used = set()
+    for x in range(G.numberOfNodes()):
+        sandpile[x] = random.randint(0, max(1,int(G.weightedDegree(x))-1))
+        
+    while len(spnodes) < sp_size:
+        i = random.choices(nodes, weights=gainmap, k=1)[0] 
+        sandpile[i] += 1
+        k = sandpile[i]
+        d = int(G.weightedDegree(i))
+        q = Queue()
+        if k > d:
+            q.put(i)
+            while not q.empty():
+                u = q.get()
+                if u not in used:
+                    spnodes.append(u)
+                    used.add(u)
+                    if len(spnodes) > sp_size:
+                        break
+                sandpile[u] = sandpile[u] - int(G.weightedDegree(u))
+                for v in G.iterNeighbors(u):
+                    if random.random() < 0.05:
+                        continue
+                    sandpile[v] += 1
+                    if sandpile[v] > int(G.weightedDegree(v)):
+                        q.put(v)
+    subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
+    mapProbToSubProb = {}
+    ct =0
+    i = 0
+    idx =0
+    change = set()
+    while i < sp_size:
+        u = spnodes[i]
+        change.add(u)
+        mapProbToSubProb[u] = idx
+        idx += 1
+        i += 1
+
+
+
+    keys = mapProbToSubProb.keys()
+    total = 0
+    j = 0
+    while j < sp_size:
+        u = spnodes[j]
+        spu = mapProbToSubProb[u]
+        for v, w in G.iterNeighborsWeights(u):
+            if v not in keys:
+                if sol[v] == 0:
+                    spv = idx
+                else:
+                    spv = idx + 1
+                subprob.increaseWeight(spu, spv, w)
+            else:
+                spv = mapProbToSubProb[v]
+                if u < v:
+                    subprob.increaseWeight(spu, spv, w)
+            total += w
+        j += 1
+
+    subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
+    return (subprob, mapProbToSubProb, idx)
+            
+            
+
+
 
 
 def randGainSubProb(G, sol, sp_size):
@@ -564,7 +642,7 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
     elif m == 1:
         subprob = randGainSubProb(G, sol, sp_size)
     else:
-        subprob = embedGainSubProb(G, sol, sp_size)
+        subprob = SOCSubProb(G, sol, sp_size)
 
     idx = subprob[2]
     mapProbToSubProb = subprob[1]
@@ -757,10 +835,9 @@ def randomMatching(G):
 
 
 def matchingCoarsening(G,C,GVs=None):
+    global sortedEdges
     edgesDropped = 0
     edgesAggregated = 0
-
-    
     n = G.numberOfNodes()
     i = 0
     j = int(n/2)
@@ -799,9 +876,7 @@ def matchingCoarsening(G,C,GVs=None):
     cG.indexEdges()
     C, _, _ = getComponents(cG)
     nC = len(C)
-    print(nC)
     if nC > 1:
-        print(C[0][0],C[1][0])
         for i in range(1, nC):
             cG.addEdge(C[0][0], C[i][0], w=0.001)
     newS = []
@@ -812,6 +887,12 @@ def matchingCoarsening(G,C,GVs=None):
                 newS.append(1)
             else:
                 newS.append(0)
+    d = 3
+    space = np.array(embedNodes(cG, d))
+    sortedEdges = []
+    for u, v, w in cG.iterEdgesWeights():
+        sortedEdges.append((embedDist(u,v,space,d),(u,v,w)))
+    sortedEdges.sort()
     return (cG, mapCoarseToFine, F, newGVs, newS)
 
 
@@ -824,7 +905,7 @@ def randInitialSolution(G):
        
 
 def getComponents(G):
-    q = Queue(maxsize = 0)
+    q = Queue()
     idx = 0
     i = 0
     componentMap = {}
@@ -847,26 +928,28 @@ def getComponents(G):
         idx += 1
     return components, componentMap, idx
             
-def sparsifyEmbedding(G, ratio, sortedEdges):
+def sparsifyEmbedding(G, ratio):
+    global sortedEdges
     n = G.numberOfNodes()
     m = G.numberOfEdges()
     e_goal = int(ratio*m)
     e_del = 0
     deletedEdges = set()
-    for i in range(len(sortedEdges)):
-        if e_del < e_goal:
-            deletedEdges.add(sortedEdges[i][1])
-            e_del += 1
-        else:
-            break
     nG = nw.graph.Graph(n=G.numberOfNodes(), directed=False,weighted=True)
     for u,v,w in G.iterEdgesWeights():
         nG.setWeight(u,v,w)
-        
-    for e in deletedEdges:
-        if e[2] != 0:
-            nG.removeEdge(e[0],e[1])
+
+    for i in range(len(sortedEdges)):
+        if e_del < e_goal:
+            e = sortedEdges[i][1]
+            nG.removeEdge(e[0], e[1])
+            e_del += 1
+        else:
+            break
+
+    
     C = getComponents(nG)
+
     if C[2] != 1:
         for e in deletedEdges:
             u = e[0]
@@ -886,7 +969,7 @@ def sparsifyEmbedding(G, ratio, sortedEdges):
     return nG
 
 
-def sparsify(G, ratio):
+def sparsifyRandom(G, ratio):
     n = G.numberOfNodes()
     m = G.numberOfEdges()
 
@@ -940,6 +1023,20 @@ def sparsify(G, ratio):
     return nG
 
 
+
+
+def sparsify(G, ratio):
+    if sparsification == 'algebraic':
+        ADS = nw.sparsification.AlgebraicDistanceSparsifier()
+        s = ADS.scores(G)
+        H = ADS.getSparsifiedGraphOfSize(G, 1 - ratio, s)
+    elif sparsification == 'embedding':
+        H = sparsifyEmbedding(G,ratio)
+    else:
+        print('random')
+        H = sparsifyRandom(G, ratio)
+    return H
+
     
 def calc_density(G):
     e = G.numberOfEdges()
@@ -953,6 +1050,7 @@ def maxcut_solve(G, C, obj=None, S=None):
     global fiedler_list
     global last_idx
     global n2vm
+    global eratio
     refinements = 0
     print(gname)
     print(str(G))
@@ -964,13 +1062,9 @@ def maxcut_solve(G, C, obj=None, S=None):
             GVs[i] = (1,1) if S[i] == 1 else (0,1)
     start = time.perf_counter()
     problem_graph = G
-    n = G.numberOfNodes()
-    density_cutoff = calc_density(G)
-    density = density_cutoff
-    if density > 0.05 and G.numberOfNodes() > 100:
-        sG = sparsifyEffRes(G, int(0.05 * (n * (n-1)/2))*10)
-        density_cutoff = calc_density(G)
-        density = density_cutoff
+    n = G.numberOfNodes()   
+    if sparsification != None:
+        sG = sparsify(G, eratio)
     else:
         sG = G
     hierarchy = [(G,sG)]
@@ -986,9 +1080,8 @@ def maxcut_solve(G, C, obj=None, S=None):
         G = coarse[0]
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
-        if calc_density(G) > density_cutoff and G.numberOfNodes() > 100:
-            n = G.numberOfNodes()
-            sG = sparsifyEffRes(G, int(density_cutoff * (n * (n-1)/2))*10)
+        if sparsification != None:
+            sG = sparsify(G, eratio)
         else:
             sG = G
 
@@ -1017,7 +1110,6 @@ def maxcut_solve(G, C, obj=None, S=None):
         solution = new_solution
         obj = calc_obj(fG, solution)
         buildGain(fG, solution)
-        print('built gain')
         ct = 0
         print(str(fG))
         nxG = nw.nxadapter.nk2nx(sG)
@@ -1056,40 +1148,10 @@ def maxcut_solve(G, C, obj=None, S=None):
         print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
         if coarseonly == 1:
-            return calc_obj(problem_graph, solution), solution
+            exit()
     return calc_obj(problem_graph, solution), solution
 
 
-
-
-def readMQLib(f):
-    f = open(f, 'r')
-    f.readline()
-    f.readline()
-    f.readline()
-    l = f.readline().split()
-    print(l)
-    sol = {}
-    for i in range(len(l)):
-        if l[i] == '-1':
-            sol[i] = 0
-        elif l[i] == '1':
-            sol[i] = 1
-    return sol
-
-def printSparse(G):
-    n = G.numberOfNodes()
-    H = sparsify(G, 0.1)
-    f = open("FF" + str(gname) + '.sparse', "w")
-    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
-    for u, v, w in H.iterEdgesWeights():
-        if u > v:
-            t = v
-            v = u
-            u = v
-        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
-    f.close()
-        
 
 def testSPSelection(G):
     global n2vm
@@ -1173,45 +1235,7 @@ if testsubprob == 1:
     exit()
 
 
-if ads == 1:
-    n = G.numberOfNodes()
-    ADS = nw.sparsification.AlgebraicDistanceSparsifier()
-    s = ADS.scores(G)
-    H = ADS.getSparsifiedGraphOfSize(G, 1 - eratio, s)
-    f = open("ADS" + str(gname) + str(eratio) +'.sparse', "w")
-    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
-    for u, v, w in H.iterEdgesWeights():
-        if u > v:
-            t = v
-            v = u
-            u = v
-        f.write(str(u+1) + " " + str(v+1) + " " + str(w) + "\n")
-    f.close()
-    H = sparsify(G, eratio)
-    f = open("FF" + str(gname) + str(eratio) + '.sparse', "w")
-    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
-    for u, v, w in H.iterEdgesWeights():
-        if u > v:
-            t = v
-            v = u
-            u = v
-        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
-    f.close()
-    _, _, sortedEdges = embeddingMatching(G, 3)
-    H = sparsifyEmbedding(G, eratio, sortedEdges)
-    f = open("EM" + str(gname) + str(eratio) + '.sparse', "w")
-    f.write(str(H.numberOfNodes()) + " " + str(H.numberOfEdges()) + "\n")
-    for u, v, w in H.iterEdgesWeights():
-        if u > v:
-            t = v
-            v = u
-            u = v
-        f.write(str(u+1) + " " + str(v+1) + " " + str(w+1) + "\n")
-    f.close()
-    exit()
-if sparse_out == 1:
-    printSparse(G)
-    exit()
+
 
 
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
@@ -1220,7 +1244,7 @@ s = time.perf_counter()
 max_obj = 0
 S = None
 for i in range(cycles):
-    obj, S = maxcut_solve(G, 2, obj=max_obj, S=S)
+    obj, S = maxcut_solve(G, 1, obj=max_obj, S=S)
     if obj > max_obj:
         max_obj = obj
 e = time.perf_counter()
