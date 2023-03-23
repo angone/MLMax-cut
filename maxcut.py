@@ -14,6 +14,7 @@ from sklearn.neighbors import KDTree
 from sortedcontainers import SortedKeyList
 from node2vec import Node2Vec
 import logging
+import gurobipy
 
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
@@ -55,6 +56,10 @@ sortedEdges = []
 lastembed = None
 threshold = {}
 nodes = []
+visits = {}
+lastdone = 0
+posgain = None
+
 
 if solver == 'qaoa':
     from qiskit import BasicAer
@@ -342,27 +347,39 @@ def updateGain(G, new_sol, old_sol):
     global gainmap
     global gainlist
     global change
+    global posgain
     for u in change:
-        if new_sol[u] != old_sol[u]:
-            gainlist.remove(u)
-            gainmap[u] = 0
-            for v, w in G.iterNeighborsWeights(u):
+        gainlist.remove(u)
+        if u in posgain:
+            posgain.remove(u)
+        gainmap[u] = 0
+        for v, w in G.iterNeighborsWeights(u):
+            if new_sol[u] == new_sol[v]:
+                gainmap[u] += w
+            else:
+                gainmap[u] -= w
+            if v not in change:
+                gainlist.remove(v)
+                if v in posgain:
+                    posgain.remove(v)
                 if new_sol[u] == new_sol[v]:
-                    gainmap[u] += w
+                    gainmap[v] += w
                 else:
-                    gainmap[u] -= w
-                if v not in change:
-                    gainlist.remove(v)
-                    if new_sol[u] == new_sol[v]:
-                        gainmap[v] += w
-                    else:
-                        gainmap[v] -= w
-                    gainlist.add(v)
-            gainlist.add(u)
+                    gainmap[v] -= w
+                gainlist.add(v)
+                if gainmap[v] > 0:
+                    posgain.add(v)
+        gainlist.add(u)
+        if gainmap[u] > 0:
+            posgain.add(u)
+            
+
                     
 def buildGain(G, sol):
     global gainmap
     global gainlist
+    global posgain
+    posgain=[]
     gainmap = []
     for i in range(G.numberOfNodes()):
         gainmap.append(0)
@@ -373,6 +390,10 @@ def buildGain(G, sol):
         else:
             gainmap[u] -= w
             gainmap[v] -= w
+    for i in range(G.numberOfNodes()):
+        if gainmap[i] > 0:
+            posgain.append(i)
+    posgain = SortedKeyList([i for i in posgain])
 
     gainlist = SortedKeyList([i for i in range(G.numberOfNodes())],key=key)
 
@@ -419,6 +440,8 @@ def n2v(G, sol, sp_size, S):
 def SOCSubProb(G, sol, sp_size):
     global gainmap
     global nodes
+    global visits
+    global change
     if len(nodes) != G.numberOfNodes():
         nodes = [i for i in range(G.numberOfNodes())]
     sandpile = {}
@@ -428,7 +451,7 @@ def SOCSubProb(G, sol, sp_size):
         sandpile[x] = random.randint(0, max(1,int(G.weightedDegree(x))-1))
         
     while len(spnodes) < sp_size:
-        i = random.choices(nodes, weights=gainmap, k=1)[0] 
+        i = random.randint(0, G.numberOfNodes()-1)
         sandpile[i] += 1
         k = sandpile[i]
         d = int(G.weightedDegree(i))
@@ -457,6 +480,7 @@ def SOCSubProb(G, sol, sp_size):
     change = set()
     while i < sp_size:
         u = spnodes[i]
+#        visits[u] += 1
         change.add(u)
         mapProbToSubProb[u] = idx
         idx += 1
@@ -643,7 +667,6 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
         subprob = randGainSubProb(G, sol, sp_size)
     else:
         subprob = SOCSubProb(G, sol, sp_size)
-
     idx = subprob[2]
     mapProbToSubProb = subprob[1]
     old_sol = {}
@@ -686,6 +709,22 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
 
     else:
         return (sol, obj, subprob)
+
+def terminateVisits(G):
+    global lastdone
+    global visits
+    if lastdone == 0 and visits == {}:
+        for i in range(G.numberOfNodes()):
+            visits[i] = 0
+    while lastdone < G.numberOfNodes():
+        if visits[lastdone] < 3:
+            return False
+        else:
+            lastdone += 1
+    lastdone = 0
+    visits = {}
+    return True
+
 
 
 
@@ -1051,6 +1090,7 @@ def maxcut_solve(G, C, obj=None, S=None):
     global last_idx
     global n2vm
     global eratio
+    global posgain
     refinements = 0
     print(gname)
     print(str(G))
@@ -1115,7 +1155,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         nxG = nw.nxadapter.nk2nx(sG)
         n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
         n2vm = n2v.fit(window=10,min_count=1).wv
-        while ct < 3:
+        while len(posgain) > 0:
             res = refine(sG, solution, spsize, obj, solver)
             refinements += 1
             updateGain(fG, res[0], solution)
@@ -1132,7 +1172,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         nxG = nw.nxadapter.nk2nx(fG)
         n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10,quiet=True)
         n2vm = n2v.fit(window=10,min_count=1).wv
-        while ct < 5:
+        while len(posgain) > 0:
             res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
             updateGain(fG, res[0], solution)
