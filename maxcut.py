@@ -14,7 +14,7 @@ from sklearn.neighbors import KDTree
 from sortedcontainers import SortedKeyList
 from node2vec import Node2Vec
 import logging
-import gurobipy
+
 
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
@@ -59,7 +59,8 @@ nodes = []
 visits = {}
 lastdone = 0
 posgain = None
-
+nodeq = Queue()
+lastspnodes = None
 
 if solver == 'qaoa':
     from qiskit import BasicAer
@@ -150,7 +151,7 @@ def pyomo(G, solver):
         opt.options['TimeLimit'] = 1
     elif solver == "ipopt":
         opt = pyo.SolverFactory('ipopt')
-        opt.options['max_cpu_time'] = 1
+        opt.options['max_cpu_time'] = 0.5
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
@@ -442,24 +443,26 @@ def SOCSubProb(G, sol, sp_size):
     global nodes
     global visits
     global change
+    global posgain
+    global lastspnodes
+    s = time.perf_counter()
     if len(nodes) != G.numberOfNodes():
         nodes = [i for i in range(G.numberOfNodes())]
-    sandpile = {}
     spnodes = []
     used = set()
+    sandpile = {}
+    nodeq = Queue()
     for x in range(G.numberOfNodes()):
         sandpile[x] = random.randint(0, max(1,int(G.weightedDegree(x))-1))
-        
     while len(spnodes) < sp_size:
         i = random.randint(0, G.numberOfNodes()-1)
         sandpile[i] += 1
         k = sandpile[i]
         d = int(G.weightedDegree(i))
-        q = Queue()
         if k > d:
-            q.put(i)
-            while not q.empty():
-                u = q.get()
+            nodeq.put(i)
+            while not nodeq.empty():
+                u = nodeq.get()
                 if u not in used:
                     spnodes.append(u)
                     used.add(u)
@@ -467,11 +470,11 @@ def SOCSubProb(G, sol, sp_size):
                         break
                 sandpile[u] = sandpile[u] - int(G.weightedDegree(u))
                 for v in G.iterNeighbors(u):
-                    if random.random() < 0.05:
+                    if random.random() < 0.1:
                         continue
                     sandpile[v] += 1
                     if sandpile[v] > int(G.weightedDegree(v)):
-                        q.put(v)
+                            nodeq.put(v)
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     mapProbToSubProb = {}
     ct =0
@@ -480,7 +483,6 @@ def SOCSubProb(G, sol, sp_size):
     change = set()
     while i < sp_size:
         u = spnodes[i]
-#        visits[u] += 1
         change.add(u)
         mapProbToSubProb[u] = idx
         idx += 1
@@ -509,6 +511,7 @@ def SOCSubProb(G, sol, sp_size):
         j += 1
 
     subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
+
     return (subprob, mapProbToSubProb, idx)
             
             
@@ -1072,7 +1075,6 @@ def sparsify(G, ratio):
     elif sparsification == 'embedding':
         H = sparsifyEmbedding(G,ratio)
     else:
-        print('random')
         H = sparsifyRandom(G, ratio)
     return H
 
@@ -1152,16 +1154,15 @@ def maxcut_solve(G, C, obj=None, S=None):
         buildGain(fG, solution)
         ct = 0
         print(str(fG))
-        nxG = nw.nxadapter.nk2nx(sG)
-        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
-        n2vm = n2v.fit(window=10,min_count=1).wv
-        while len(posgain) > 0:
+#        nxG = nw.nxadapter.nk2nx(sG)
+#        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
+#        n2vm = n2v.fit(window=10,min_count=1).wv
+        while len(posgain) > 0 and ct < 5:
             res = refine(sG, solution, spsize, obj, solver)
             refinements += 1
             updateGain(fG, res[0], solution)
             solution = res[0]
             new_obj = calc_obj(fG, solution)
-            
             if new_obj <= obj:
                 ct += 1
             else:
@@ -1169,10 +1170,10 @@ def maxcut_solve(G, C, obj=None, S=None):
                 last_idx = 0
                 obj = new_obj
         ct = 0
-        nxG = nw.nxadapter.nk2nx(fG)
-        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10,quiet=True)
-        n2vm = n2v.fit(window=10,min_count=1).wv
-        while len(posgain) > 0:
+#        nxG = nw.nxadapter.nk2nx(fG)
+#        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10,quiet=True)
+#        n2vm = n2v.fit(window=10,min_count=1).wv
+        while len(posgain) > 0 and ct < 5:
             res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
             updateGain(fG, res[0], solution)
