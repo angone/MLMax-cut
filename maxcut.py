@@ -12,9 +12,8 @@ import faulthandler
 from scipy.optimize import minimize
 from sklearn.neighbors import KDTree
 from sortedcontainers import SortedKeyList
-from node2vec import Node2Vec
 import logging
-
+import MQLib as mq
 
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
@@ -90,10 +89,10 @@ if solver == 'qaoa':
 
 
 def readGraph():
-    f = open(gname, "r")
+    f = open('graphs/' + gname, "r")
     line = f.readline().split()
     n = int(eval(line[0]))
-    G = nw.graph.Graph(n=0,weighted=False, directed=False)
+    G = nw.graph.Graph(n=0,weighted=True, directed=False)
     G.addNodes(n)
     cn = 0
     line = f.readline().split()
@@ -129,10 +128,12 @@ def readGraphEList():
     return G
         
 
-    
-
-
-
+def mqlibSolve(G):
+    Q = build_qubo(G)/2
+    i = mq.Instance('M',Q)
+    def f(s):
+        return 1
+    print(mq.runHeuristic("BURER2002", i, 10, f, 100)['objval'])
 
 def get_exact_energy(G, p):
     obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
@@ -145,18 +146,20 @@ def get_exact_energy(G, p):
 
 
 
-def pyomo(G, solver):
+def pyomo(G, solver, sol):
+    global gainmap
     if solver == "gurobi":
-        opt = pyo.SolverFactory('gurobi')
-        opt.options['TimeLimit'] = 1
+        opt = pyo.SolverFactory('gurobi_direct')
+        opt.options['TimeLimit'] = 0.5
     elif solver == "ipopt":
         opt = pyo.SolverFactory('ipopt')
-        opt.options['max_cpu_time'] = 0.5
+        opt.options['max_cpu_time'] = 0.25
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
     model.obj = pyo.Objective(expr = 0)
     model.c = pyo.Constraint(rule=model.x[2]<=1)
+
     for u,v in G.iterEdges():
         w = G.weight(u,v)
         model.obj.expr += (2 * w * model.x[u] * model.x[v])
@@ -308,18 +311,15 @@ def randSampleSolve(G):
     
             
 def build_qubo(G):
-    Q = {}
     n = G.numberOfNodes()
-    for i in range(n):
-        for j in range(i,n):
-            Q[(i,j)] = 0            
-    for i in range(n):
-        for j in range(i+1, n):
-            if G.hasEdge(i,j):
-                weight = G.weight(i, j)
-                Q[(i, i)] -= weight
-                Q[(j,j)] -= weight
-                Q[(i, j)] = 2*weight
+    Q = np.zeros((n,n))
+    for u, v, w in G.iterEdgesWeights():
+        Q[u][u] -= w
+        Q[v][v] -= w
+        if u < v:
+            Q[u][v] = 2*w
+        else:
+            Q[v][u] = 2*w
     return Q 
 
 def fineSolFromCoarseSol(cSol, ctfM):
@@ -443,8 +443,7 @@ def SOCSubProb(G, sol, sp_size):
     global nodes
     global visits
     global change
-    global posgain
-    global lastspnodes
+
     s = time.perf_counter()
     if len(nodes) != G.numberOfNodes():
         nodes = [i for i in range(G.numberOfNodes())]
@@ -477,6 +476,7 @@ def SOCSubProb(G, sol, sp_size):
                             nodeq.put(v)
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     mapProbToSubProb = {}
+    mapSubProbToProb = {}
     ct =0
     i = 0
     idx =0
@@ -485,6 +485,7 @@ def SOCSubProb(G, sol, sp_size):
         u = spnodes[i]
         change.add(u)
         mapProbToSubProb[u] = idx
+        mapSubProbToProb[idx] = u
         idx += 1
         i += 1
 
@@ -512,7 +513,7 @@ def SOCSubProb(G, sol, sp_size):
 
     subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
 
-    return (subprob, mapProbToSubProb, idx)
+    return (subprob, mapProbToSubProb, idx, mapSubProbToProb)
             
             
 
@@ -525,12 +526,11 @@ def randGainSubProb(G, sol, sp_size):
     global change
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     
-    l = [i for i in range(G.numberOfNodes())]
-    S = l
 
     gain = gainlist[:sp_size]
 
     mapProbToSubProb = {}
+    mapSubProbToProb = {}
     ct =0
     i = 0
     idx =0
@@ -539,6 +539,7 @@ def randGainSubProb(G, sol, sp_size):
         u = gain[i]
         change.add(u)
         mapProbToSubProb[u] = idx
+        mapSubProbToProb[idx] = u
         idx += 1
         i += 1
 
@@ -565,7 +566,7 @@ def randGainSubProb(G, sol, sp_size):
         j += 1
 
     subprob.increaseWeight(idx, idx+1, G.totalEdgeWeight() - total)
-    return (subprob, mapProbToSubProb, idx)
+    return (subprob, mapProbToSubProb, idx, mapSubProbToProb)
 
 
 
@@ -672,7 +673,10 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
         subprob = SOCSubProb(G, sol, sp_size)
     idx = subprob[2]
     mapProbToSubProb = subprob[1]
+    mapSubProbToProb = subprob[3]
     old_sol = {}
+    for u in mapSubProbToProb.keys():
+        old_sol[u] = sol[mapSubProbToProb[u]]
     old_sol[idx] = 0
     old_sol[idx+1] = 1
     if spsolver == "qbsolv":
@@ -682,9 +686,9 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
     elif spsolver == "qaoa":
         solution = qaoa(subprob[0])
     elif spsolver == "gurobi":
-        solution = pyomo(subprob[0], spsolver)
+        solution = pyomo(subprob[0], spsolver, old_sol)
     elif spsolver == "ipopt":
-        solution = pyomo(subprob[0], spsolver)
+        solution = pyomo(subprob[0], spsolver, old_sol)
     elif spsolver == "sampling":
         solution = randSampleSolve(subprob[0])
 
@@ -708,8 +712,8 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
         if sol[i] != new_sol[i]:
             changes.append(i)
     if new_obj > obj:
+        updateGain(G, new_sol, sol)
         return (new_sol, new_obj, subprob)
-
     else:
         return (sol, obj, subprob)
 
@@ -1118,7 +1122,7 @@ def maxcut_solve(G, C, obj=None, S=None):
         old = G.numberOfNodes()
         if new < spsize:
             break
-        coarse= matchingCoarsening(sG, C, GVs)    
+        coarse= matchingCoarsening(G, C, GVs)    
         G = coarse[0]
         GVs = coarse[3]
         fiedler_list.append(coarse[2])
@@ -1154,13 +1158,35 @@ def maxcut_solve(G, C, obj=None, S=None):
         buildGain(fG, solution)
         ct = 0
         print(str(fG))
-#        nxG = nw.nxadapter.nk2nx(sG)
-#        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
-#        n2vm = n2v.fit(window=10,min_count=1).wv
-        while len(posgain) > 0 and ct < 5:
-            res = refine(sG, solution, spsize, obj, solver)
+       # while len(posgain) > 0 and ct < 1:
+       #     res = refine(sG, solution, spsize, obj, solver, m=1)
+       #     refinements += 1
+       #     solution = res[0]
+       #     new_obj = calc_obj(fG, solution)
+       #     if new_obj <= obj:
+       #         ct += 1
+       #     else:
+       #         ct = 0
+       #         last_idx = 0
+       #         obj = new_obj
+       # ct = 0
+       # buildGain(fG, solution)
+       # while len(posgain) > 0 and ct < 5:
+       #     res = refine(sG, solution, spsize, obj, solver)
+       #     refinements += 1
+       #     solution = res[0]
+       #     new_obj = calc_obj(fG, solution)
+       #     if new_obj <= obj:
+       #         ct += 1
+       #     else:
+       #         ct = 0
+       #         last_idx = 0
+       #         obj = new_obj
+       # ct = 0
+       # buildGain(fG, solution)
+        while len(posgain) > 0 and ct < 1:
+            res = refine(fG, solution, spsize, obj, solver, m=1)
             refinements += 1
-            updateGain(fG, res[0], solution)
             solution = res[0]
             new_obj = calc_obj(fG, solution)
             if new_obj <= obj:
@@ -1170,13 +1196,10 @@ def maxcut_solve(G, C, obj=None, S=None):
                 last_idx = 0
                 obj = new_obj
         ct = 0
-#        nxG = nw.nxadapter.nk2nx(fG)
-#        n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10,quiet=True)
-#        n2vm = n2v.fit(window=10,min_count=1).wv
+        buildGain(fG, solution)
         while len(posgain) > 0 and ct < 5:
             res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
-            updateGain(fG, res[0], solution)
             solution = res[0]
             new_obj = res[1]
             if new_obj <= obj:
@@ -1185,9 +1208,20 @@ def maxcut_solve(G, C, obj=None, S=None):
                 ct = 0
                 last_idx = 0
                 obj = new_obj
+        buildGain(fG, solution)
+        while len(posgain) > 0:
+            u = posgain.pop(0)
+            solution[u] = 1 - solution[u]
+            new_obj = calc_obj(fG, solution)
+            refinements += 1
+            if new_obj > obj:
+                obj = new_obj
+            else:
+                solution[u] = 1 - solution[u]
         print("\nTOTAL REFINEMENTS: " + str(refinements))
         print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
+        mqlibSolve(fG)
         if coarseonly == 1:
             exit()
     return calc_obj(problem_graph, solution), solution
@@ -1271,16 +1305,14 @@ if gformat == 'alist':
 elif gformat == 'elist':
     G = readGraphEList()
 
-if testsubprob == 1:
-    testSPSelection(G)
-    exit()
-
 
 
 
 
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
+
+
 s = time.perf_counter()
 max_obj = 0
 S = None
