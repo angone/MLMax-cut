@@ -64,9 +64,10 @@ lastspnodes = None
 if solver == 'qaoa':
     from qiskit import BasicAer
     from qiskit.algorithms import QAOA
-    import qiskit.aqua.components.optimizers as optimizers
+#    import qiskit.aqua.components.optimizers as optimizers
     from qiskit.algorithms.optimizers import L_BFGS_B
     from qiskit.algorithms.optimizers import COBYLA
+    from qiskit_optimization.applications import Maxcut
     from QAOAKit.utils import (
         precompute_energies,
         maxcut_obj,
@@ -127,13 +128,34 @@ def readGraphEList():
     G.removeSelfLoops()
     return G
         
+def cutoff():
+    global gainlist
+    if gainlist == None:
+        return 0
+    n = len(gainlist)
+    s = 0
+    e = n
 
-def mqlibSolve(G):
+    while e != s:
+        m = int((e+s)/2)
+        k = gainmap[gainlist[m]]
+        if k == 0:
+            return m
+        elif k > 0:
+            s = m + 1
+            if len(gainlist) > m+1 and gainmap[gainlist[m+1]] <= 0:
+                return m
+        elif k < 0:
+            e = m-1
+    return m
+
+def mqlibSolve(G, t):
     Q = build_qubo(G)/2
     i = mq.Instance('M',Q)
     def f(s):
         return 1
-    print(mq.runHeuristic("BURER2002", i, 10, f, 100)['objval'])
+    res = mq.runHeuristic("BURER2002", i, t, f, 100)
+    return (res['solution']+1)/2 
 
 def get_exact_energy(G, p):
     obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
@@ -153,7 +175,9 @@ def pyomo(G, solver, sol):
         opt.options['TimeLimit'] = 0.5
     elif solver == "ipopt":
         opt = pyo.SolverFactory('ipopt')
-        opt.options['max_cpu_time'] = 0.25
+        opt.options['max_cpu_time'] = 1
+    elif solver == 'mqlib':
+        return mqlibSolve(G, 0.05)
     model = pyo.ConcreteModel()
     model.n = pyo.Param(default=G.numberOfNodes())
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
@@ -406,35 +430,6 @@ def randomWalk(E, p, u):
     if random.random() < p:
         return randomWalk(E, p/2, v)
     return u
-    
-def n2v(G, sol, sp_size, S):
-    global gainlist
-    global n2vm
-    global last_idx
-    n = G.numberOfNodes()
-
-    E = n2vm
-    V = set()
-    spnodes = []
-    
-        
-    while len(V) < sp_size:        
-        u = gainlist[last_idx]
-        if u not in V and u in S:
-            V.add(u)
-            near = E.most_similar(str(u))
-            for x in near:
-                X = randomWalk(E, 0.5, int(x[0]))
-                if len(V) > sp_size:
-                    break
-                
-                elif X not in V and x in S:
-                    V.add(int(X))
-        last_idx = (last_idx + 1) % len(gainlist)
-    for u in V:
-        spnodes.append(u)
-
-    return spnodes
 
 
 
@@ -443,7 +438,8 @@ def SOCSubProb(G, sol, sp_size):
     global nodes
     global visits
     global change
-
+    global gainlist
+    global lastdone
     s = time.perf_counter()
     if len(nodes) != G.numberOfNodes():
         nodes = [i for i in range(G.numberOfNodes())]
@@ -451,29 +447,40 @@ def SOCSubProb(G, sol, sp_size):
     used = set()
     sandpile = {}
     nodeq = Queue()
+    C = cutoff()
     for x in range(G.numberOfNodes()):
         sandpile[x] = random.randint(0, max(1,int(G.weightedDegree(x))-1))
     while len(spnodes) < sp_size:
-        i = random.randint(0, G.numberOfNodes()-1)
+        k = random.random()
+        if k < 0.4 and C > 1:
+            i = random.randint(0, C-1)
+            i = gainlist[i]
+        elif k < 0.8:
+            i = random.randint(lastdone, G.numberOfNodes()-1)
+        else:
+            i = random.randint(0, G.numberOfNodes()-1)
         sandpile[i] += 1
         k = sandpile[i]
         d = int(G.weightedDegree(i))
         if k > d:
-            nodeq.put(i)
+            if i not in used:
+                nodeq.put(i)
             while not nodeq.empty():
                 u = nodeq.get()
-                if u not in used:
-                    spnodes.append(u)
-                    used.add(u)
-                    if len(spnodes) > sp_size:
-                        break
-                sandpile[u] = sandpile[u] - int(G.weightedDegree(u))
+                if u in used:
+                    continue
+                spnodes.append(u)
+                used.add(u)
+                if len(spnodes) >= sp_size:
+                    break
+                sandpile[u] = sandpile[u] - int(sandpile[u]/G.weightedDegree(u))*int(G.weightedDegree(u))
                 for v in G.iterNeighbors(u):
-                    if random.random() < 0.1:
-                        continue
-                    sandpile[v] += 1
-                    if sandpile[v] > int(G.weightedDegree(v)):
+                    if v not in used:
+                        sandpile[v] += 1
+                        if sandpile[v] > int(G.weightedDegree(v)):
                             nodeq.put(v)
+
+
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     mapProbToSubProb = {}
     mapSubProbToProb = {}
@@ -624,17 +631,19 @@ def embedGainSubProb(G, sol, sp_size):
 
 def qaoa(G, p=3):
     n = G.numberOfNodes()
-    mw = 0
-    d_w = 0
-    for x in G.iterNodes():
-        d_w += G.degree(x)
-    d_w = d_w / n
-    for u,v,w in G.iterEdgesWeights():
-        mw += abs(w)
-    mw = mw / G.numberOfEdges()
+    #mw = 0
+    #d_w = 0
+    #for x in G.iterNodes():
+    #    d_w += G.degree(x)
+    #d_w = d_w / n
+    #for u,v,w in G.iterEdgesWeights():
+    #    mw += abs(w)
+    #mw = mw / G.numberOfEdges()
     G = nw.nxadapter.nk2nx(G)
+    print(str(G))
     w = nx.adjacency_matrix(G)
 
+#    problem = Maxcut(G).to_quadratic_program()
     problem = QuadraticProgram()
     _ = [problem.binary_var(f"x{i}") for i in range(n)]
     linear = w.dot(np.ones(n))
@@ -644,17 +653,18 @@ def qaoa(G, p=3):
     for _ in range(n-1):
         c.append(0)
     problem.linear_constraint(c, '==', 1)
-
     cobyla = COBYLA()
     backend = BasicAer.get_backend('qasm_simulator')
-    beta = median[p:]
-    if d_w <= 1:
-        d_w = 1.001
-    gamma = median[:p] * np.arctan(1/np.sqrt(d_w-1)) / mw
-    init = np.concatenate((beta, gamma))
-    qaoa = QAOA(optimizer=cobyla, reps=3, quantum_instance=backend, initial_point = init)
+    #beta = median[p:]
+    #if d_w <= 1:
+    #    d_w = 1.001
+    #gamma = median[:p] * np.arctan(1/np.sqrt(d_w-1)) / mw
+    #init = np.concatenate((beta, gamma))
+    qaoa = QAOA(optimizer=cobyla, reps=3, quantum_instance=backend)
     algorithm=MinimumEigenOptimizer(qaoa)
+    print('solving')
     result = algorithm.solve(problem)
+    print('solved')
     L = result.x
     i = 0
     res = {}
@@ -685,13 +695,12 @@ def refine(G, sol, sp_size, obj, spsolver, sp=None, m=0):
         solution = response.samples()[0]
     elif spsolver == "qaoa":
         solution = qaoa(subprob[0])
-    elif spsolver == "gurobi":
+    elif spsolver == "gurobi" or spsolver == "mqlib":
         solution = pyomo(subprob[0], spsolver, old_sol)
     elif spsolver == "ipopt":
         solution = pyomo(subprob[0], spsolver, old_sol)
     elif spsolver == "sampling":
         solution = randSampleSolve(subprob[0])
-
     
     n = G.numberOfNodes()
     new_sol = {}
@@ -724,7 +733,7 @@ def terminateVisits(G):
         for i in range(G.numberOfNodes()):
             visits[i] = 0
     while lastdone < G.numberOfNodes():
-        if visits[lastdone] < 3:
+        if visits[lastdone] < 1:
             return False
         else:
             lastdone += 1
@@ -1139,7 +1148,10 @@ def maxcut_solve(G, C, obj=None, S=None):
     fiedler_list.reverse()
     hierarchy_map.reverse()
     hierarchy.reverse()
-    solution = randInitialSolution(G)
+    if solver == 'qaoa':
+        solution = randInitialSolution(G)
+    else:
+        solution = mqlibSolve(G, 5)
     if obj == None:
         obj = 0
     for i in range(len(hierarchy_map)):
@@ -1197,7 +1209,7 @@ def maxcut_solve(G, C, obj=None, S=None):
                 obj = new_obj
         ct = 0
         buildGain(fG, solution)
-        while len(posgain) > 0 and ct < 5:
+        while len(posgain) > 0 and ct < 5 and not terminateVisits(fG):
             res = refine(fG, solution, spsize, obj, solver)                
             refinements += 1
             solution = res[0]
@@ -1208,106 +1220,28 @@ def maxcut_solve(G, C, obj=None, S=None):
                 ct = 0
                 last_idx = 0
                 obj = new_obj
+
+        print("\nTOTAL REFINEMENTS: " + str(refinements))
+        print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
+        print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
+#        print("Ratio to MQLib: ", obj/calc_obj(fG, mqlibSolve(fG,5)))
+        if coarseonly == 1:
+            exit()
         buildGain(fG, solution)
         while len(posgain) > 0:
             u = posgain.pop(0)
             solution[u] = 1 - solution[u]
             new_obj = calc_obj(fG, solution)
-            refinements += 1
             if new_obj > obj:
                 obj = new_obj
             else:
                 solution[u] = 1 - solution[u]
-        print("\nTOTAL REFINEMENTS: " + str(refinements))
-        print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
-        print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
-        mqlibSolve(fG)
-        if coarseonly == 1:
-            exit()
     return calc_obj(problem_graph, solution), solution
-
-
-
-def testSPSelection(G):
-    global n2vm
-    solution = randInitialSolution(G)
-    obj = calc_obj(G, solution)
-    buildGain(G, solution)
-    print(gname)
-    ct = 0
-    print("random gain")
-    for i in range(251):
-        if ct > 20:
-            print('no more improvement')
-            break
-        res = refine(G, solution, spsize, obj, solver, m=1)                
-        updateGain(G, res[0], solution)
-        solution = res[0]
-        new_obj = res[1]
-        if new_obj > obj:
-            obj = new_obj
-            ct = 0
-        else:
-            ct += 1
-        if i % 50 == 0:
-            print(str(i) + ": " + str(new_obj))
-    print("FINAL: " + str(obj))
-    obj = 0
-    ct = 0
-    solution = randInitialSolution(G)
-    print("embed gain")
-    nxG = nw.nxadapter.nk2nx(G)
-    n2v = Node2Vec(nxG, dimensions=3,walk_length=16,num_walks=10, quiet=True)
-    n2vm = n2v.fit(window=10,min_count=1).wv
-    for i in range(251):
-        if ct > 20:
-            print('no more improvement')
-            break
-        res = refine(G, solution, spsize, obj, solver, m=0)                
-        updateGain(G, res[0], solution)
-        solution = res[0]
-        new_obj = res[1]
-        if new_obj > obj:
-            obj = new_obj
-            ct = 0
-        else:
-            ct += 1
-        if i % 50 == 0:
-            print(str(i) + ": " + str(new_obj))
-    print("FINAL: " + str(obj))
-    print('mixed gain')
-    obj = 0
-    solution = randInitialSolution(G)
-    ct = 0
-    M = 1
-    for i in range(251):
-        if ct > 5:
-            M = 0
-            ct = 0
-        if ct > 20:
-            print('no more improvement')
-            break
-        res = refine(G, solution, spsize, obj, solver, m=M)
-        updateGain(G, res[0], solution)
-        solution = res[0]
-        new_obj = res[1]
-        if new_obj > obj:
-            obj = new_obj
-            ct = 0
-        else:
-            ct += 1
-        if i % 50 == 0:
-            print(str(i) + ": " + str(new_obj))
-    print("FINAL: " + str(obj))
 
 if gformat == 'alist':
     G = readGraph()
 elif gformat == 'elist':
     G = readGraphEList()
-
-
-
-
 
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
