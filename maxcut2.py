@@ -282,7 +282,6 @@ class Refinement:
         subprob = self.SOCSubProb()
         idx = subprob[2]
         mapProbToSubProb = subprob[1]
-        mapSubProbToProb = subprob[3]
         S = self.mqlibSolve(0.25, subprob[0])
         new_sol = self.solution
         
@@ -320,13 +319,14 @@ class MaxcutSolver:
             self.hierarchy.append(E)
             G = E.cG
         R = Refinement(G, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
-        R.refine()
+        for _ in range(5):
+            R.refine()
 
         
         
 
 s = time.perf_counter()
-M = MaxcutSolver('G1', 18, 'mqlib')
+M = MaxcutSolver('G1', 98, 'mqlib')
 M.solve()
 t = time.perf_counter()
 print(t-s)
