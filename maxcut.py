@@ -115,8 +115,8 @@ def readGraphEList():
     G = nw.graph.Graph(n=n, weighted=True, directed = False)
     line = f.readline().split()
     while line != []:
-        u = int(line[0])-1
-        v =  int(line[1])-1
+        u = int(line[0])
+        v =  int(line[1])
         if len(line) > 2:
             w = int(eval(line[2]))
         else:
@@ -480,7 +480,8 @@ def SOCSubProb(G, sol, sp_size):
                         if sandpile[v] > int(G.weightedDegree(v)):
                             nodeq.put(v)
 
-
+    print(spnodes)
+    print(gainmap)
     subprob = nw.graph.Graph(n=sp_size+2, weighted = True, directed = False)
     mapProbToSubProb = {}
     mapSubProbToProb = {}
@@ -1148,7 +1149,7 @@ def maxcut_solve(G, C, obj=None, S=None):
     fiedler_list.reverse()
     hierarchy_map.reverse()
     hierarchy.reverse()
-    if solver == 'qaoa':
+    if solver == 'mqlib':
         solution = randInitialSolution(G)
     else:
         solution = mqlibSolve(G, 5)
@@ -1170,32 +1171,6 @@ def maxcut_solve(G, C, obj=None, S=None):
         buildGain(fG, solution)
         ct = 0
         print(str(fG))
-       # while len(posgain) > 0 and ct < 1:
-       #     res = refine(sG, solution, spsize, obj, solver, m=1)
-       #     refinements += 1
-       #     solution = res[0]
-       #     new_obj = calc_obj(fG, solution)
-       #     if new_obj <= obj:
-       #         ct += 1
-       #     else:
-       #         ct = 0
-       #         last_idx = 0
-       #         obj = new_obj
-       # ct = 0
-       # buildGain(fG, solution)
-       # while len(posgain) > 0 and ct < 5:
-       #     res = refine(sG, solution, spsize, obj, solver)
-       #     refinements += 1
-       #     solution = res[0]
-       #     new_obj = calc_obj(fG, solution)
-       #     if new_obj <= obj:
-       #         ct += 1
-       #     else:
-       #         ct = 0
-       #         last_idx = 0
-       #         obj = new_obj
-       # ct = 0
-       # buildGain(fG, solution)
         while len(posgain) > 0 and ct < 1:
             res = refine(fG, solution, spsize, obj, solver, m=1)
             refinements += 1
@@ -1220,11 +1195,17 @@ def maxcut_solve(G, C, obj=None, S=None):
                 ct = 0
                 last_idx = 0
                 obj = new_obj
-
+        if i == 1:
+            f = open('small.graph', 'w')
+            print('printing graph')
+            f.write(str(G.numberOfNodes()) + ' ' + str(G.numberOfEdges()) +'\n')
+            for u,v,w in fG.iterEdgesWeights():
+                f.write(str(u)+' '+str(v)+' '+str(w)+'\n')
+            f.close()
         print("\nTOTAL REFINEMENTS: " + str(refinements))
         print(gname + " OBJECTIVE AFTER REFINEMENT: " + str(obj))
         print("IMBALANCE: " + str(calc_imbalance(solution, fG.numberOfNodes())))
-#        print("Ratio to MQLib: ", obj/calc_obj(fG, mqlibSolve(fG,5)))
+        print("MQLib: ", calc_obj(fG, mqlibSolve(fG,5)))
         if coarseonly == 1:
             exit()
         buildGain(fG, solution)
@@ -1238,6 +1219,8 @@ def maxcut_solve(G, C, obj=None, S=None):
                 solution[u] = 1 - solution[u]
     return calc_obj(problem_graph, solution), solution
 
+
+random.seed(0)
 if gformat == 'alist':
     G = readGraph()
 elif gformat == 'elist':
@@ -1245,6 +1228,8 @@ elif gformat == 'elist':
 
 G = nw.components.ConnectedComponents.extractLargestConnectedComponent(G)
 print(str(G))
+for v in G.iterNodes():
+    print(v, G.weightedDegree(v))
 
 
 s = time.perf_counter()
