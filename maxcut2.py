@@ -294,6 +294,7 @@ class Refinement:
             self.obj = new_obj
             self.sol_history.append(self.solution)
             self.solution = new_sol
+            print(self.obj)
             
 
 
@@ -319,6 +320,7 @@ class MaxcutSolver:
             self.hierarchy.append(E)
             G = E.cG
         R = Refinement(G, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
+        R.refine()
 
         
         
