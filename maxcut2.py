@@ -160,18 +160,18 @@ class EmbeddingCoarsening:
         self.cG.removeSelfLoops()
         self.cG.indexEdges()
     
-
 class Refinement:
     def __init__(self, G, spsize, solver, solution):
         self.G = G
         self.n = G.numberOfNodes()
         self.gainmap = np.zeros((G.numberOfNodes(),1))
+        self.buildGain()
         self.spsize = spsize
         self.solver = solver
         self.solution = solution
         self.posgain = 0
         self.obj = self.calc_obj(G, solution)
-        self.sol_history = [solution]
+        self.last_subprob = None
 
     def calc_obj(self, G, solution):
         obj = 0
@@ -210,6 +210,26 @@ class Refinement:
         for i in range(self.n):
             if self.gainmap[i] >= 0:
                 self.posgain += 1
+
+    def updateGain(self):
+        used = set()
+        if self.last_subprob == None:
+            return
+        for u in self.last_subprob:
+            self.gainmap[u] = 0
+            for v, w in self.G.iterNeighborsWeights(u):
+                if self.solution[u] == self.solution[v]:
+                    self.gainmap[u] += w
+                else:
+                    self.gainmap[u] -= w
+                if v not in used:
+                    used.add(v)
+                    self.gainmap[v] = 0
+                    for x, y in self.G.iterNeighborsWeights(v):
+                        if self.solution[v] == self.solution[x]:
+                            self.gainmap[v] += y
+                        else:
+                            self.gainmap[v] -= y
 
     def SOCSubProb(self):
         spnodes = []
@@ -251,7 +271,7 @@ class Refinement:
             mapProbToSubProb[u] = idx
             idx += 1
             i += 1
-
+        self.last_subprob = spnodes
 
 
         keys = mapProbToSubProb.keys()
@@ -293,14 +313,10 @@ class Refinement:
             self.obj = new_obj
             self.sol_history.append(self.solution)
             self.solution = new_sol
+            self.updateGain()
+            print(self.gainmap)
             print(self.obj)
             
-
-
-
-
-    
-
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
@@ -323,8 +339,6 @@ class MaxcutSolver:
             R.refine()
 
         
-        
-
 s = time.perf_counter()
 M = MaxcutSolver('G1', 98, 'mqlib')
 M.solve()
