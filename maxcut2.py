@@ -215,6 +215,7 @@ class Refinement:
         return (res['solution']+1)/2 
 
     def buildGain(self):
+        posgain = []
         for u,v,w in self.G.iterEdgesWeights():
             if self.solution[u] == self.solution[v]:
                 self.gainmap[u] += w
@@ -222,6 +223,10 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
+        for i in range(G.numberOfNodes()):
+            if self.gainmap[i] > 0:
+                posgain.append(i)
+        self.posgain = SortedKeyList([i for i in posgain])
 
     def updateGain(self):
         used = set()
@@ -242,6 +247,11 @@ class Refinement:
                             self.gainmap[v] += y
                         else:
                             self.gainmap[v] -= y
+        posgain = []
+        for i in range(self.G.numberOfNodes()):
+            if self.gainmap[i] > 0:
+                posgain.append(i)
+        self.posgain = SortedKeyList([i for i in posgain])
 
     def SOCSubProb(self):
         spnodes = []
@@ -330,6 +340,7 @@ class Refinement:
 
     def refineLevel(self):
         while not self.terminate():
+            print(self.posgain)
             self.refine()
 
 class MaxcutSolver:
