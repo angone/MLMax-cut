@@ -175,6 +175,7 @@ class Refinement:
         self.buildGain()
         self.obj = self.calc_obj(G, solution)
         self.last_subprob = None
+        self.unused = SortedKeyList([i for i in range(self.n)])
 
     def refine_coarse(self):
         return self.mqlibSolve(5, G=self.G)
@@ -271,6 +272,13 @@ class Refinement:
         for x in range(self.G.numberOfNodes()):
             sandpile[x] = random.randint(0, max(1,int(self.G.weightedDegree(x))-1))
         while len(spnodes) < self.spsize:
+            j = -1
+            if random.random() < 0.5:
+                j = random.randint(0, len(self.posgain))
+                i = self.posgain[i]
+            else:
+                j = random.randint(0, len(self.unused))
+                i = self.unused[i]
             i = random.randint(0, self.G.numberOfNodes()-1)
             sandpile[i] += 1
             k = sandpile[i]
@@ -301,6 +309,8 @@ class Refinement:
             u = spnodes[i]
             change.add(u)
             self.uses[u] += 1
+            if u in self.unused:
+                self.unused.remove(u)
             mapProbToSubProb[u] = idx
             idx += 1
             i += 1
