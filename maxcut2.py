@@ -165,12 +165,20 @@ class Refinement:
         self.G = G
         self.n = G.numberOfNodes()
         self.gainmap = np.zeros((G.numberOfNodes(),1))
+        self.uses = np.zeros((G.numberOfNodes(), 1))
         self.spsize = spsize
         self.solver = solver
         self.solution = solution
         self.buildGain()
         self.obj = self.calc_obj(G, solution)
         self.last_subprob = None
+
+
+    def terminate(self):
+        for i in range(self.n):
+            if self.gainmap[i] > 0 or self.uses[i] < 2:
+                return False
+        return True
 
     def calc_obj(self, G, solution):
         obj = 0
@@ -264,6 +272,7 @@ class Refinement:
         while i < self.spsize:
             u = spnodes[i]
             change.add(u)
+            self.uses[u] += 1
             mapProbToSubProb[u] = idx
             idx += 1
             i += 1
@@ -309,9 +318,12 @@ class Refinement:
             self.obj = new_obj
             self.solution = new_sol
             self.updateGain()
-            print(self.gainmap)
             print(self.obj)
-            
+
+    def refineLevel(self):
+        while not self.terminate():
+            self.refine()
+
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
@@ -330,8 +342,7 @@ class MaxcutSolver:
             self.hierarchy.append(E)
             G = E.cG
         R = Refinement(G, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
-        for _ in range(5):
-            R.refine()
+        R.refineLevel()
 
         
 s = time.perf_counter()
