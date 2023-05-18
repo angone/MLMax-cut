@@ -160,6 +160,9 @@ class EmbeddingCoarsening:
         self.cG.removeSelfLoops()
         self.cG.indexEdges()
     
+
+
+
 class Refinement:
     def __init__(self, G, spsize, solver, solution):
         self.G = G
@@ -173,7 +176,9 @@ class Refinement:
         self.obj = self.calc_obj(G, solution)
         self.last_subprob = None
 
-
+    def refine_coarse(self):
+        return self.mqlibSolve(5, G=self.G)
+    
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
@@ -188,10 +193,12 @@ class Refinement:
         return -1 * obj
     
     def mqlibSolve(self, t, G=None):
-        n = self.G.numberOfNodes()
         Q = np.zeros((n,n))
         if G == None:
             G = self.G
+            n = self.G.numberOfNodes()
+        else:
+            n = G.numberOfNodes()
         for u, v, w in G.iterEdgesWeights():
             Q[u][u] -= w
             Q[v][v] -= w
@@ -332,6 +339,8 @@ class MaxcutSolver:
         self.hierarchy_map = []
         self.spsize = sp
         self.solver = solver
+        self.solution = None
+        self.obj = 0
 
     def solve(self):
         G = self.problem_graph
@@ -341,8 +350,15 @@ class MaxcutSolver:
             print(E.cG)
             self.hierarchy.append(E)
             G = E.cG
-        R = Refinement(G, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
-        R.refineLevel()
+        self.hierarchy.reverse()
+        R = Refinement(G, 98, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
+        self.solution = R.refine_coarse()
+        print(self.solution)
+        exit()
+        for i in range(1, len(self.hierarchy)):
+            E = self.hierarchy[i]
+            R = Refinement(E.cG, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
+            R.refineLevel()
 
         
 s = time.perf_counter()
