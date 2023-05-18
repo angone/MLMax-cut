@@ -354,7 +354,6 @@ class Refinement:
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol.copy()
-        print(self.obj)
         self.updateGain()
 
     def refineLevel(self):
@@ -363,7 +362,9 @@ class Refinement:
         while not self.terminate():
             self.refine()
         #self.testGain()
-        
+    
+    def benchmark(self):
+        print('MQ obj:', self.mqlibSolve(10, self.G))
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
@@ -400,11 +401,12 @@ class MaxcutSolver:
             R.refineLevel()
             self.solution = R.solution
             self.obj = R.obj
-            print('objective:',self.obj)
+            print('ML obj:',self.obj)
+            R.benchmark()
 
         
 s = time.perf_counter()
-M = MaxcutSolver('G1', 18, 'mqlib')
+M = MaxcutSolver('G1', 98, 'mqlib')
 M.solve()
 t = time.perf_counter()
 print(t-s)
