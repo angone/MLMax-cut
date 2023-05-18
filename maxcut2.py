@@ -369,7 +369,7 @@ class MaxcutSolver:
     def __init__(self, fname, sp, solver):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
         self.problem_graph = nw.components.ConnectedComponents.extractLargestConnectedComponent(self.problem_graph)
-        self.hierarchy = [self.problem_graph]
+        self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
         self.solver = solver
@@ -400,6 +400,7 @@ class MaxcutSolver:
             R.refineLevel()
             self.solution = R.solution
             self.obj = R.obj
+            print('objective:',self.obj)
 
         
 s = time.perf_counter()
