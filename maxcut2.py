@@ -182,6 +182,7 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
+                print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
                 return False
         return True
 
