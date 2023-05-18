@@ -183,8 +183,12 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
-                print(self.gainmap)
-                print(self.unused)
+                s = self.solution.copy()
+                print('before:',self.calc_obj(self.G, s))
+                s[i] = 1-s[i]
+                print('after:',self.calc_obj(self.G, s))
+                #print(self.gainmap)
+                #print(self.unused)
                 return False
         return True
 
