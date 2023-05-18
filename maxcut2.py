@@ -335,7 +335,7 @@ class Refinement:
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol
-            self.updateGain()
+            self.buildGain()
         print(self.obj)
 
     def refineLevel(self):
