@@ -182,7 +182,7 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
-                print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
+                #print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
                 return False
         return True
 
@@ -223,7 +223,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        for i in range(G.numberOfNodes()):
+        for i in range(self.G.numberOfNodes()):
             if self.gainmap[i] > 0:
                 posgain.append(i)
         self.posgain = SortedKeyList([i for i in posgain])
