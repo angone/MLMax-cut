@@ -274,14 +274,10 @@ class Refinement:
         while len(spnodes) < self.spsize:
             j = -1
             if random.random() < 0.5 and len(self.posgain) > 0:
-                j = random.randint(0, len(self.posgain))
-                print(j)
-                print(self.posgain)
+                j = random.randint(0, len(self.posgain)-1)
                 i = self.posgain[j]
             elif len(self.unused) > 0:
-                j = random.randint(0, len(self.unused))
-                print(j)
-                print(self.unused)
+                j = random.randint(0, len(self.unused)-1)
                 i = self.unused[j]
             else:
                 i = random.randint(0, self.G.numberOfNodes()-1)
