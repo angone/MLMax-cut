@@ -215,6 +215,7 @@ class Refinement:
         return (res['solution']+1)/2 
 
     def testGain(self):
+        self.buildGain()
         for i in range(len(self.gainmap)):
             if self.gainmap[i] > 0:
                 print('before:',self.obj)
