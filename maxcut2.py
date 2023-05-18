@@ -344,7 +344,6 @@ class Refinement:
 
     def refine(self):
         subprob = self.SOCSubProb()
-        idx = subprob[2]
         mapProbToSubProb = subprob[1]
         S = self.mqlibSolve(0.25, subprob[0])
         new_sol = self.solution
@@ -361,14 +360,8 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        while not self.terminate() and ct < 10:
+        while not self.terminate():
             self.refine()
-            if self.obj > obj:
-                ct = 0
-                obj = self.obj
-                print(obj)
-            else:
-                ct += 1
         self.testGain()
         
 
