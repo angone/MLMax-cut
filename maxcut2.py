@@ -183,12 +183,6 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
-                s = self.solution.copy()
-                print('before:',self.calc_obj(self.G, s))
-                s[i] = 1-s[i]
-                print('after:',self.calc_obj(self.G, s))
-                #print(self.gainmap)
-                #print(self.unused)
                 return False
         return True
 
@@ -351,7 +345,7 @@ class Refinement:
         subprob = self.SOCSubProb()
         mapProbToSubProb = subprob[1]
         S = self.mqlibSolve(0.25, subprob[0])
-        new_sol = self.solution
+        new_sol = self.solution.copy()
         
         keys = mapProbToSubProb.keys()
         for i in keys:
@@ -359,15 +353,16 @@ class Refinement:
         new_obj = self.calc_obj(self.G, new_sol)
         if new_obj >= self.obj:
             self.obj = new_obj
-            self.solution = new_sol
-            self.updateGain()
+            self.solution = new_sol.copy()
+        print(self.obj)
+        self.updateGain()
 
     def refineLevel(self):
         ct = 0
         obj = 0
         while not self.terminate():
             self.refine()
-        self.testGain()
+        #self.testGain()
         
 
 class MaxcutSolver:
