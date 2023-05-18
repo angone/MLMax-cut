@@ -165,11 +165,10 @@ class Refinement:
         self.G = G
         self.n = G.numberOfNodes()
         self.gainmap = np.zeros((G.numberOfNodes(),1))
-        self.buildGain()
         self.spsize = spsize
         self.solver = solver
         self.solution = solution
-        self.posgain = 0
+        self.buildGain()
         self.obj = self.calc_obj(G, solution)
         self.last_subprob = None
 
@@ -207,9 +206,6 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        for i in range(self.n):
-            if self.gainmap[i] >= 0:
-                self.posgain += 1
 
     def updateGain(self):
         used = set()
@@ -311,7 +307,6 @@ class Refinement:
         new_obj = self.calc_obj(self.G, new_sol)
         if new_obj >= self.obj:
             self.obj = new_obj
-            self.sol_history.append(self.solution)
             self.solution = new_sol
             self.updateGain()
             print(self.gainmap)
