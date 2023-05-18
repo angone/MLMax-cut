@@ -273,13 +273,16 @@ class Refinement:
             sandpile[x] = random.randint(0, max(1,int(self.G.weightedDegree(x))-1))
         while len(spnodes) < self.spsize:
             j = -1
-            if random.random() < 0.5:
+            if random.random() < 0.5 and len(self.posgain) > 0:
                 j = random.randint(0, len(self.posgain))
-                i = self.posgain[i]
-            else:
+                print(j)
+                print(self.posgain)
+                i = self.posgain[j]
+            elif len(self.unused) > 0:
                 j = random.randint(0, len(self.unused))
-                i = self.unused[i]
-            i = random.randint(0, self.G.numberOfNodes()-1)
+                i = self.unused[j]
+            else:
+                i = random.randint(0, self.G.numberOfNodes()-1)
             sandpile[i] += 1
             k = sandpile[i]
             d = int(self.G.weightedDegree(i))
@@ -360,7 +363,7 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        while not self.terminate() and ct < 5:
+        while not self.terminate() and ct < 10:
             self.refine()
             if self.obj > obj:
                 ct = 0
