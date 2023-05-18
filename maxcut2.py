@@ -218,10 +218,11 @@ class Refinement:
         self.buildGain()
         for i in range(len(self.gainmap)):
             if self.gainmap[i] > 0:
+                print('Node', i, 'gain: ', self.gainmap[i])
                 print('before:',self.calc_obj(self.G, self.solution))
                 self.solution[i] = 1 - self.solution[i]
                 print('after:',self.calc_obj(self.G, self.solution))
-                return
+                self.solution[i] = 1 - self.solution[i]
 
     def buildGain(self):
         posgain = []
