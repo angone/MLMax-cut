@@ -365,6 +365,7 @@ class Refinement:
     
     def benchmark(self):
         print('MQ obj:', self.calc_obj(self.G, self.mqlibSolve(10, self.G)))
+        print(self.posgain)
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
