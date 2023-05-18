@@ -218,7 +218,7 @@ class Refinement:
         self.buildGain()
         for i in range(len(self.gainmap)):
             if self.gainmap[i] > 0:
-                print('before:',self.obj)
+                print('before:',self.calc_obj(self.G, self.solution))
                 self.solution[i] = 1 - self.solution[i]
                 print('after:',self.calc_obj(self.G, self.solution))
                 return
