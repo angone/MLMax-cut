@@ -13,7 +13,7 @@ from sortedcontainers import SortedKeyList
 import logging
 import MQLib as mq
 
-
+random.seed(0)
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
 
@@ -183,7 +183,8 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
-                print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
+                print(self.gainmap)
+                print(self.unused)
                 return False
         return True
 
@@ -396,7 +397,7 @@ class MaxcutSolver:
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            R = Refinement(E.G, 98, 'mqlib', self.solution)
+            R = Refinement(E.G, 18, 'mqlib', self.solution)
             R.refineLevel()
             self.solution = R.solution
             self.obj = R.obj
