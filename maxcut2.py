@@ -405,7 +405,7 @@ class MaxcutSolver:
 
         
 s = time.perf_counter()
-M = MaxcutSolver('G1', 98, 'mqlib')
+M = MaxcutSolver('G1', 18, 'mqlib')
 M.solve()
 t = time.perf_counter()
 print(t-s)
