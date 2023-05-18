@@ -193,12 +193,12 @@ class Refinement:
         return -1 * obj
     
     def mqlibSolve(self, t, G=None):
-        Q = np.zeros((n,n))
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
         else:
             n = G.numberOfNodes()
+        Q = np.zeros((n,n))
         for u, v, w in G.iterEdgesWeights():
             Q[u][u] -= w
             Q[v][v] -= w
@@ -354,9 +354,12 @@ class MaxcutSolver:
         R = Refinement(G, 98, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         self.solution = R.refine_coarse()
         print(self.solution)
-        exit()
         for i in range(1, len(self.hierarchy)):
             E = self.hierarchy[i]
+            G = E.cG
+            coarseToFine = E.mapFineToCoarse
+            print(str(G), len(coarseToFine))
+            S = [0 for _ in range(G.numberOfNodes())]
             R = Refinement(E.cG, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
             R.refineLevel()
 
