@@ -182,7 +182,7 @@ class Refinement:
     def terminate(self):
         for i in range(self.n):
             if self.gainmap[i] > 0 or self.uses[i] < 2:
-                #print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
+                print('node:', i, 'gain', self.gainmap[i], 'uses:', self.uses[i])
                 return False
         return True
 
@@ -335,12 +335,11 @@ class Refinement:
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol
-            self.buildGain()
+            self.updateGain()
         print(self.obj)
 
     def refineLevel(self):
         while not self.terminate():
-            print(self.posgain)
             self.refine()
 
 class MaxcutSolver:
