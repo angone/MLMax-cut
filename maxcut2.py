@@ -268,7 +268,7 @@ class Refinement:
             sandpile[x] = random.randint(0, max(1,int(self.G.weightedDegree(x))-1))
         while len(spnodes) < self.spsize:
             j = -1
-            if random.random() < 0.5 and len(self.posgain) > 0:
+            if random.random() < 0.80 and len(self.posgain) > 0:
                 j = random.randint(0, len(self.posgain)-1)
                 i = self.posgain[j]
             elif len(self.unused) > 0:
