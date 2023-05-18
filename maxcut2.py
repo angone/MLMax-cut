@@ -214,6 +214,14 @@ class Refinement:
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
         return (res['solution']+1)/2 
 
+    def testGain(self):
+        for i in range(len(self.gainmap)):
+            if self.gainmap[i] > 0:
+                print('before:',self.obj)
+                self.solution[i] = 1 - self.solution[i]
+                print('after:',self.calc_obj(self.G, self.solution))
+                return
+
     def buildGain(self):
         posgain = []
         for u,v,w in self.G.iterEdgesWeights():
@@ -336,11 +344,20 @@ class Refinement:
             self.obj = new_obj
             self.solution = new_sol
             self.updateGain()
-        print(self.obj)
 
     def refineLevel(self):
-        while not self.terminate():
+        ct = 0
+        obj = 0
+        while not self.terminate() and ct < 5:
             self.refine()
+            if self.obj > obj:
+                ct = 0
+                obj = self.obj
+                print(obj)
+            else:
+                ct += 1
+        self.testGain()
+        
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
