@@ -342,6 +342,13 @@ class MaxcutSolver:
         self.solution = None
         self.obj = 0
 
+    def calc_obj(self):
+        obj = 0
+        n = self.G.numberOfNodes()
+        for u, v in G.iterEdges():
+            obj += self.G.weight(u, v)*(2*self.solution[u]*self.solution[v] - self.solution[u] - self.solution[v])
+        return -1 * obj
+    
     def solve(self):
         G = self.problem_graph
         while G.numberOfNodes() > 2*self.spsize:
@@ -353,10 +360,9 @@ class MaxcutSolver:
         self.hierarchy.reverse()
         R = Refinement(G, 98, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         self.solution = R.refine_coarse()
-        print(self.solution)
-        for i in range(1, len(self.hierarchy)):
+        for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
-            G = E.cG
+            G = E.G
             coarseToFine = E.mapFineToCoarse
             print(str(G), len(coarseToFine))
             S = [0 for _ in range(G.numberOfNodes())]
