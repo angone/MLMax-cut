@@ -363,10 +363,13 @@ class MaxcutSolver:
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
-            coarseToFine = E.mapFineToCoarse
-            print(str(G), len(coarseToFine))
+            fineToCoarse = E.mapFineToCoarse
+            print(str(G), len(fineToCoarse))
             S = [0 for _ in range(G.numberOfNodes())]
-            R = Refinement(E.cG, 98, 'mqlib', [0 for _ in range(G.numberOfNodes())])
+            for i in range(len(S)):
+                S[i] = self.solution[fineToCoarse[i]]
+            self.solution = S
+            R = Refinement(E.cG, 98, 'mqlib', self.solution)
             R.refineLevel()
 
         
