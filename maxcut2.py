@@ -14,19 +14,18 @@ import logging
 import MQLib as mq
 
 random.seed(0)
+np.random.seed(0)
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-g", type = str, default = "None", help = "graph file")
 parser.add_argument("-sp", type = int, default = 18, help = "size of subproblems")
-parser.add_argument("-S", type = str, default = "gurobi", help = "subproblem solver")
+parser.add_argument("-S", type = str, default = "mqlib", help = "subproblem solver")
 parser.add_argument("-f", type = str, default = "elist", help = "graph format")
 parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
-
-
 
 
 class EmbeddingCoarsening:
@@ -160,9 +159,6 @@ class EmbeddingCoarsening:
         self.cG.removeSelfLoops()
         self.cG.indexEdges()
     
-
-
-
 class Refinement:
     def __init__(self, G, spsize, solver, solution):
         self.G = G
@@ -404,10 +400,9 @@ class MaxcutSolver:
             self.obj = R.obj
             print('ML obj:',self.obj)
             R.benchmark()
-
-        
+    
 s = time.perf_counter()
-M = MaxcutSolver('G1', 98, 'mqlib')
+M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
-print(t-s)
+print('Found obj', M.obj, 'in', t-s, 's')
