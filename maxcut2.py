@@ -325,7 +325,7 @@ class Refinement:
             self.obj = new_obj
             self.solution = new_sol
             self.updateGain()
-            print(self.obj)
+        print(self.obj)
 
     def refineLevel(self):
         while not self.terminate():
@@ -341,13 +341,6 @@ class MaxcutSolver:
         self.solver = solver
         self.solution = None
         self.obj = 0
-
-    def calc_obj(self):
-        obj = 0
-        n = self.G.numberOfNodes()
-        for u, v in G.iterEdges():
-            obj += self.G.weight(u, v)*(2*self.solution[u]*self.solution[v] - self.solution[u] - self.solution[v])
-        return -1 * obj
     
     def solve(self):
         G = self.problem_graph
