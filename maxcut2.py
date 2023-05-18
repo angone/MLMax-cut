@@ -280,6 +280,8 @@ class Refinement:
                 i = self.posgain[j]
             elif len(self.unused) > 0:
                 j = random.randint(0, len(self.unused))
+                print(j)
+                print(self.unused)
                 i = self.unused[j]
             else:
                 i = random.randint(0, self.G.numberOfNodes()-1)
