@@ -15,7 +15,6 @@ import MQLib as mq
 
 random.seed(0)
 np.random.seed(0)
-logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -172,6 +171,8 @@ class Refinement:
         self.obj = self.calc_obj(G, solution)
         self.last_subprob = None
         self.unused = SortedKeyList([i for i in range(self.n)])
+        self.locked_nodes = set()
+        self.alpha = 0.5
 
     def refine_coarse(self):
         return self.mqlibSolve(5, G=self.G)
@@ -210,18 +211,7 @@ class Refinement:
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
         return (res['solution']+1)/2 
 
-    def testGain(self):
-        self.buildGain()
-        for i in range(len(self.gainmap)):
-            if self.gainmap[i] > 0:
-                print('Node', i, 'gain: ', self.gainmap[i])
-                print('before:',self.calc_obj(self.G, self.solution))
-                self.solution[i] = 1 - self.solution[i]
-                print('after:',self.calc_obj(self.G, self.solution))
-                self.solution[i] = 1 - self.solution[i]
-
     def buildGain(self):
-        posgain = []
         for u,v,w in self.G.iterEdgesWeights():
             if self.solution[u] == self.solution[v]:
                 self.gainmap[u] += w
@@ -229,35 +219,78 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        for i in range(self.G.numberOfNodes()):
-            if self.gainmap[i] > 0:
-                posgain.append(i)
-        self.posgain = SortedKeyList([i for i in posgain])
-
+            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
+    
     def updateGain(self):
         used = set()
         if self.last_subprob == None:
             return
         for u in self.last_subprob:
             self.gainmap[u] = 0
+            self.gainlist.remove(u)
+            self.locked_nodes.add(u)
             for v, w in self.G.iterNeighborsWeights(u):
                 if self.solution[u] == self.solution[v]:
                     self.gainmap[u] += w
                 else:
                     self.gainmap[u] -= w
                 if v not in used:
+                    self.gainlist.remove(v)
                     used.add(v)
                     self.gainmap[v] = 0
                     for x, y in self.G.iterNeighborsWeights(v):
+                        if x in self.locked_nodes:
+                            y = y*(1+self.alpha)
                         if self.solution[v] == self.solution[x]:
                             self.gainmap[v] += y
                         else:
                             self.gainmap[v] -= y
-        posgain = []
-        for i in range(self.G.numberOfNodes()):
-            if self.gainmap[i] > 0:
-                posgain.append(i)
-        self.posgain = SortedKeyList([i for i in posgain])
+                    self.gainlist.add(v)
+        
+
+    def lockGainSubProb(self):
+        spnodes = self.gainlist[:self.spsize]
+        subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
+        mapProbToSubProb = {}
+        ct =0
+        i = 0
+        idx =0
+        change = set()
+        while i < self.spsize:
+            u = spnodes[i]
+            change.add(u)
+            self.uses[u] += 1
+            if u in self.unused:
+                self.unused.remove(u)
+            mapProbToSubProb[u] = idx
+            idx += 1
+            i += 1
+        self.last_subprob = spnodes
+
+
+        keys = mapProbToSubProb.keys()
+        total = 0
+        j = 0
+        while j < self.spsize:
+            u = spnodes[j]
+            spu = mapProbToSubProb[u]
+            for v, w in self.G.iterNeighborsWeights(u):
+                if v not in keys:
+                    if self.solution[v] == 0:
+                        spv = idx
+                    else:
+                        spv = idx + 1
+                    subprob.increaseWeight(spu, spv, w)
+                else:
+                    spv = mapProbToSubProb[v]
+                    if u < v:
+                        subprob.increaseWeight(spu, spv, w)
+                total += w
+            j += 1
+
+        subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
+
+        return (subprob, mapProbToSubProb, idx)
 
     def SOCSubProb(self):
         spnodes = []
@@ -357,11 +390,6 @@ class Refinement:
         obj = 0
         while not self.terminate():
             self.refine()
-        #self.testGain()
-    
-    def benchmark(self):
-        print('MQ obj:', self.calc_obj(self.G, self.mqlibSolve(10, self.G)))
-        print(self.posgain)
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
