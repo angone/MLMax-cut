@@ -220,7 +220,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.1*x)
     
     def updateGain(self):
         used = set()
@@ -235,9 +235,7 @@ class Refinement:
                     self.gainmap[u] += w
                 else:
                     self.gainmap[u] -= w
-                if v not in used:
-                    print(self.gainlist)
-                    print(self.gainmap)
+                if v not in self.locked_nodes:
                     self.gainlist.remove(v)
                     used.add(v)
                     self.gainmap[v] = 0
