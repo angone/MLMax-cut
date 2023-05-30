@@ -228,6 +228,7 @@ class Refinement:
             return
         for u in self.last_subprob:
             self.gainmap[u] = 0
+            print(self.gainlist)
             self.gainlist.remove(u)
             self.locked_nodes.add(u)
             for v, w in self.G.iterNeighborsWeights(u):
