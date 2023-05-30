@@ -265,7 +265,6 @@ class Refinement:
         while i < self.spsize:
             u = spnodes[i]
             change.add(u)
-            self.uses[u] += 1
             if u in self.unused:
                 self.unused.remove(u)
             mapProbToSubProb[u] = idx
@@ -377,7 +376,7 @@ class Refinement:
         return (subprob, mapProbToSubProb, idx)
 
     def refine(self):
-        subprob = self.SOCSubProb()
+        subprob = self.lockGainSubProb()
         mapProbToSubProb = subprob[1]
         S = self.mqlibSolve(0.25, subprob[0])
         new_sol = self.solution.copy()
