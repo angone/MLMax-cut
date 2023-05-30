@@ -220,7 +220,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
     
     def updateGain(self):
         used = set()
@@ -254,7 +254,7 @@ class Refinement:
             spnodes = self.gainlist[:self.spsize]
         else:
             self.passes += 1
-            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
+            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
             spnodes = self.gainlist[:self.spsize]
         subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
