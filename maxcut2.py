@@ -175,7 +175,8 @@ class Refinement:
         self.alpha = 0.5
 
     def refine_coarse(self):
-        return self.mqlibSolve(5, G=self.G)
+        self.solution = self.mqlibSolve(5, G=self.G)
+        self.obj = self.calc_obj(self.G, self.solution)
     
     def terminate(self):
         for i in range(self.n):
@@ -417,8 +418,9 @@ class MaxcutSolver:
             G = E.cG
         self.hierarchy.reverse()
         R = Refinement(G, 18, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
-        self.solution = R.refine_coarse()
- 
+        R.refine_coarse()
+        self.obj = R.obj
+        self.solution = R.solution
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
@@ -432,17 +434,6 @@ class MaxcutSolver:
             R.refineLevel()
             self.solution = R.solution
             self.obj = R.obj
-            A = self.solution
-            B = R.mqlibSolve(5,G)
-            similarity = 0
-            for c in range(len(A)):
-                if A[c] == B[c]:
-                    similarity += 1
-            print(similarity / len(A))
-            print(A)
-            print(B)
-            exit()
-            R.benchmark()
     
 s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
