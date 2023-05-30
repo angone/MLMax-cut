@@ -236,6 +236,8 @@ class Refinement:
                 else:
                     self.gainmap[u] -= w
                 if v not in used:
+                    print(self.gainlist)
+                    print(self.gainmap)
                     self.gainlist.remove(v)
                     used.add(v)
                     self.gainmap[v] = 0
