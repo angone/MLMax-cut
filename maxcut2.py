@@ -162,7 +162,7 @@ class Refinement:
     def __init__(self, G, spsize, solver, solution):
         self.G = G
         self.n = G.numberOfNodes()
-        self.gainmap = np.zeros((G.numberOfNodes(),1))
+        self.gainmap = [0 for _ in range(self.n)]
         self.passes = 0
         self.spsize = spsize
         self.solver = solver
