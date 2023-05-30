@@ -163,7 +163,7 @@ class Refinement:
         self.G = G
         self.n = G.numberOfNodes()
         self.gainmap = np.zeros((G.numberOfNodes(),1))
-        self.uses = np.zeros((G.numberOfNodes(), 1))
+        self.passes = 0
         self.spsize = spsize
         self.solver = solver
         self.solution = solution
@@ -249,7 +249,12 @@ class Refinement:
         
 
     def lockGainSubProb(self):
-        spnodes = self.gainlist[:self.spsize]
+        if len(self.gainlist) >= self.spsize:
+            spnodes = self.gainlist[:self.spsize]
+        else:
+            self.passes += 1
+            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
+            spnodes = self.gainlist[:self.spsize]
         subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
         ct =0
@@ -388,7 +393,7 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        while not self.terminate():
+        while self.passes < 4:
             self.refine()
 
 class MaxcutSolver:
