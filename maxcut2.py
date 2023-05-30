@@ -220,7 +220,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x])
     
     def updateGain(self):
         used = set()
@@ -229,7 +229,8 @@ class Refinement:
         for u in self.last_subprob:
             self.gainmap[u] = 0
             print(self.gainlist)
-            self.gainlist.remove(u)
+            if u in self.gainlist:
+                self.gainlist.remove(u)
             self.locked_nodes.add(u)
             for v, w in self.G.iterNeighborsWeights(u):
                 if self.solution[u] == self.solution[v]:
