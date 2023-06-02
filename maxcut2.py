@@ -253,7 +253,7 @@ class Refinement:
         if len(self.gainlist) >= self.spsize:
             spnodes = self.gainlist[:self.spsize]
         else:
-            spnodes = self.gainlist[len(self.gainlist)-1]
+            spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
             self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
