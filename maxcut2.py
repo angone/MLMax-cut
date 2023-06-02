@@ -227,7 +227,6 @@ class Refinement:
         used = set()
         if self.last_subprob == None:
             return
-        print(self.gainlist)    
         for u in self.last_subprob:
             self.gainlist.remove(u)
             self.locked_nodes.add(u)
