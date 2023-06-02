@@ -279,7 +279,6 @@ class Refinement:
                 if self.gainlist[k] not in used:
                     spnodes.append(self.gainlist[k])
                     used.add(k)
-                    c += 1
 
         subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
