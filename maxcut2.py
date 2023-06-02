@@ -403,6 +403,7 @@ class Refinement:
         obj = 0
         while self.passes < 4:
             self.refine()
+        print("Objective at", self.n, "nodes:", self.obj)
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
