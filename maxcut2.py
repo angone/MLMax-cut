@@ -268,7 +268,7 @@ class Refinement:
                         c += 1
         else:
             print(self.obj)
-            spnodes = self.gainlist[:len(self.gainlist)-1]
+            spnodes = self.gainlist[:len(self.gainlist)]
             used = set(spnodes)
             self.passes += 1
             self.randomness += 0.1
