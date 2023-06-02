@@ -253,6 +253,7 @@ class Refinement:
         if len(self.gainlist) >= self.spsize:
             spnodes = self.gainlist[:self.spsize]
         else:
+            print(self.obj)
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
