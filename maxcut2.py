@@ -264,7 +264,7 @@ class Refinement:
                     k = random.randint(0, len(self.gainlist)-1)
                     if self.gainlist[k] not in used:
                         spnodes.append(self.gainlist[k])
-                        used.add(k)
+                        used.add(self.gainlist[k])
                         c += 1
         else:
             print(self.obj)
@@ -277,7 +277,7 @@ class Refinement:
                 k = random.randint(0, len(self.gainlist)-1)
                 if self.gainlist[k] not in used:
                     spnodes.append(self.gainlist[k])
-                    used.add(k)
+                    used.add(self.gainlist[k])
 
         subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
