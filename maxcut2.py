@@ -273,7 +273,7 @@ class Refinement:
             used = set(spnodes)
             self.passes += 1
             self.randomness += 0.1
-            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
+            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.0001*x)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, len(self.gainlist)-1)
                 if k not in used:
