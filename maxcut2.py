@@ -227,10 +227,8 @@ class Refinement:
         used = set()
         if self.last_subprob == None:
             return
-        print(self.last_subprob)    
+        print(self.gainlist)    
         for u in self.last_subprob:
-            if u not in self.gainlist:
-                continue
             self.gainlist.remove(u)
             self.locked_nodes.add(u)
             self.gainmap[u] = 0
@@ -265,8 +263,8 @@ class Refinement:
                 c = 0
                 while c < randomnodes:
                     k = random.randint(0, len(self.gainlist)-1)
-                    if k not in used:
-                        spnodes.append(k)
+                    if self.gainlist[k] not in used:
+                        spnodes.append(self.gainlist[k])
                         used.add(k)
                         c += 1
         else:
@@ -278,9 +276,10 @@ class Refinement:
             self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.0001*x)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, len(self.gainlist)-1)
-                if k not in used:
-                    spnodes.append(k)
+                if self.gainlist[k] not in used:
+                    spnodes.append(self.gainlist[k])
                     used.add(k)
+                    c += 1
 
         subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
