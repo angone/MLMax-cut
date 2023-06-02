@@ -229,6 +229,8 @@ class Refinement:
             return
         print(self.last_subprob)    
         for u in self.last_subprob:
+            if u not in self.gainlist:
+                continue
             self.gainlist.remove(u)
             self.locked_nodes.add(u)
             self.gainmap[u] = 0
