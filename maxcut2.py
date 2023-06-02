@@ -173,6 +173,7 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.25
+        self.randomness = 0
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -251,12 +252,26 @@ class Refinement:
 
     def lockGainSubProb(self):
         if len(self.gainlist) >= self.spsize:
-            spnodes = self.gainlist[:self.spsize]
+            if self.randomness == 0:
+                spnodes = self.gainlist[:self.spsize]
+            else:
+                randomnodes = int(self.randomness * self.spsize)
+                spsize = self.spsize - randomnodes
+                spnodes = self.gainlist[:spsize]
+                used = set(spnodes)
+                c = 0
+                while c < randomnodes:
+                    k = random.randint(0, len(self.gainlist)-1)
+                    if k not in used:
+                        spnodes.append(k)
+                        used.add(k)
+                        c += 1
         else:
             print(self.obj)
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
+            self.randomness += 0.1
             self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.001*x)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, len(self.gainlist)-1)
