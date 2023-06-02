@@ -172,7 +172,7 @@ class Refinement:
         self.last_subprob = None
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
-        self.alpha = 0.5
+        self.alpha = 0.25
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
