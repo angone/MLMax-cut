@@ -249,9 +249,11 @@ class Refinement:
                             self.gainmap[v] -= y
                     self.gainlist.add(v)
         
-
-    def lockGainSubProb(self):
-        if len(self.gainlist) >= self.spsize:
+    def lockGainSubProb(self, spnodes=None):
+        if spnodes != None:
+            spsize = len(spnodes)
+        elif len(self.gainlist) >= self.spsize and spnodes:
+            spsize = self.spsize
             if self.randomness == 0:
                 spnodes = self.gainlist[:self.spsize]
             else:
@@ -267,6 +269,7 @@ class Refinement:
                         used.add(self.gainlist[k])
                         c += 1
         else:
+            spsize = self.spsize
             print(self.obj)
             spnodes = self.gainlist[:len(self.gainlist)]
             used = set(spnodes)
@@ -279,13 +282,13 @@ class Refinement:
                     spnodes.append(self.gainlist[k])
                     used.add(self.gainlist[k])
 
-        subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
+        subprob = nw.graph.Graph(n=spsize+2, weighted = True, directed = False)
         mapProbToSubProb = {}
         ct =0
         i = 0
         idx =0
         change = set()
-        while i < self.spsize:
+        while i < spsize:
             u = spnodes[i]
             change.add(u)
             if u in self.unused:
@@ -299,7 +302,7 @@ class Refinement:
         keys = mapProbToSubProb.keys()
         total = 0
         j = 0
-        while j < self.spsize:
+        while j < spsize:
             u = spnodes[j]
             spu = mapProbToSubProb[u]
             for v, w in self.G.iterNeighborsWeights(u):
@@ -419,6 +422,31 @@ class Refinement:
         while self.passes < 4:
             self.refine()
         print("Objective at", self.n, "nodes:", self.obj)
+
+    def test(self):
+        S = self.mqlibSolve(5, G=self.G)
+        O = self.calc_obj(self.G, self.solution)
+        print("MQLib:",O)
+        print("MLM:", self.obj)
+        spnodes = []
+        ct = 0
+        for i in range(self.n):
+            if S[i] == self.solution[i]:
+                spnodes.append(i)
+                ct += 1
+        subprob = self.lockGainSubProb(spnodes)
+        mapProbToSubProb = subprob[1]
+        S2 = self.mqlibSolve(0.25, subprob[0])
+        new_sol = self.solution.copy()
+        
+        keys = mapProbToSubProb.keys()
+        for i in keys:
+            new_sol[i] = S2[mapProbToSubProb[i]]
+        new_obj = self.calc_obj(self.G, new_sol)
+        print("after sp:",new_obj)
+
+
+
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
