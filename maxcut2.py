@@ -271,7 +271,7 @@ class Refinement:
         else:
             spsize = self.spsize
             print(self.obj)
-            spnodes = self.gainlist[:len(self.gainlist)]
+            spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
             self.randomness += 0.1
