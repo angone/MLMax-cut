@@ -483,6 +483,7 @@ class MaxcutSolver:
             self.solution = S
             R = Refinement(E.G, 18, 'mqlib', self.solution)
             R.refineLevel()
+            R.test()
             self.solution = R.solution
             self.obj = R.obj
     
