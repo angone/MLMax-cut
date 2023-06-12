@@ -26,7 +26,6 @@ parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embeddi
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
-
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape):
         self.G = G
@@ -174,6 +173,8 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 0
+        self.bound = 20
+        self.increase = 0.05
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -252,9 +253,8 @@ class Refinement:
     def lockGainSubProb(self, spnodes=None):
         if spnodes != None:
             spsize = len(spnodes)
-        elif len(self.gainlist) >= self.spsize and spnodes:
-            spsize = self.spsize
-            if self.randomness == 0:
+        elif len(self.gainlist) >= self.spsize:
+            if self.randomness <= 0:
                 spnodes = self.gainlist[:self.spsize]
             else:
                 randomnodes = int(self.randomness * self.spsize)
@@ -274,7 +274,7 @@ class Refinement:
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
-            self.randomness += 0.1
+            self.randomness += self.increase
             self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.0001*x)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, len(self.gainlist)-1)
@@ -282,13 +282,13 @@ class Refinement:
                     spnodes.append(self.gainlist[k])
                     used.add(self.gainlist[k])
 
-        subprob = nw.graph.Graph(n=spsize+2, weighted = True, directed = False)
+        subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
         mapProbToSubProb = {}
         ct =0
         i = 0
         idx =0
         change = set()
-        while i < spsize:
+        while i < len(spnodes):
             u = spnodes[i]
             change.add(u)
             if u in self.unused:
@@ -302,7 +302,7 @@ class Refinement:
         keys = mapProbToSubProb.keys()
         total = 0
         j = 0
-        while j < spsize:
+        while j < len(spnodes):
             u = spnodes[j]
             spu = mapProbToSubProb[u]
             for v, w in self.G.iterNeighborsWeights(u):
@@ -419,13 +419,13 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        while self.passes < 4:
+        while self.passes < self.bound:
             self.refine()
         print("Objective at", self.n, "nodes:", self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
-        O = self.calc_obj(self.G, self.solution)
+        O = self.calc_obj(self.G, S)
         print("MQLib:",O)
         print("MLM:", self.obj)
         spnodes = []
@@ -434,16 +434,20 @@ class Refinement:
             if S[i] == self.solution[i]:
                 spnodes.append(i)
                 ct += 1
-        subprob = self.lockGainSubProb(spnodes)
-        mapProbToSubProb = subprob[1]
-        S2 = self.mqlibSolve(0.25, subprob[0])
-        new_sol = self.solution.copy()
+        print("diff:", ct)
+        if ct > 2:
+            subprob = self.lockGainSubProb(spnodes)
+            mapProbToSubProb = subprob[1]
+            S2 = self.mqlibSolve(5, subprob[0])
+            new_sol = self.solution.copy()
         
-        keys = mapProbToSubProb.keys()
-        for i in keys:
-            new_sol[i] = S2[mapProbToSubProb[i]]
-        new_obj = self.calc_obj(self.G, new_sol)
-        print("after sp:",new_obj)
+            keys = mapProbToSubProb.keys()
+            for i in keys:
+                new_sol[i] = S2[mapProbToSubProb[i]]
+            new_obj = self.calc_obj(self.G, new_sol)
+            print("after sp:",new_obj)
+        print(subprob)
+        print(self.gainmap)
 
 
 
