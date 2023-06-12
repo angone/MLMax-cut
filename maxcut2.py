@@ -29,7 +29,7 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
 def parallel(ref):
-    R = Refinement(ref[0], self.spsize, 'mqlib', ref[1])
+    R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
     return R.solution, R.obj
 
