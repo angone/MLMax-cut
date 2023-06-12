@@ -12,6 +12,8 @@ from sklearn.neighbors import KDTree
 from sortedcontainers import SortedKeyList
 import logging
 import MQLib as mq
+import multiprocessing
+
 
 random.seed(0)
 np.random.seed(0)
@@ -25,6 +27,9 @@ parser.add_argument("-f", type = str, default = "elist", help = "graph format")
 parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
+
+
+        
 
 
 class EmbeddingCoarsening:
@@ -445,9 +450,6 @@ class Refinement:
         new_obj = self.calc_obj(self.G, new_sol)
         print("after sp:",new_obj)
 
-
-
-
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
@@ -459,6 +461,13 @@ class MaxcutSolver:
         self.solution = None
         self.obj = 0
     
+    def noisySolution(self, ratio):
+        S = self.solution.copy()
+        for i in range(int(len(S)*ratio)):
+            k = random.randint(0, len(S)-1)
+            S[k] = 1 - S[k]
+        return S
+    
     def solve(self):
         G = self.problem_graph
         while G.numberOfNodes() > 2*self.spsize:
@@ -468,7 +477,7 @@ class MaxcutSolver:
             self.hierarchy.append(E)
             G = E.cG
         self.hierarchy.reverse()
-        R = Refinement(G, 18, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
+        R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
@@ -481,9 +490,26 @@ class MaxcutSolver:
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            R = Refinement(E.G, 18, 'mqlib', self.solution)
-            R.refineLevel()
-            R.test()
+            if False:
+                R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
+                R.refineLevel()
+                #R.test()
+            else:
+                noisySols = [self.noisySolution(0.2) for _ in range(39)]
+                noisySols.append(self.solution.copy())
+                inputs = []
+                for x in noisySols:
+                    inputs.append((E.G, x))
+                pool = multiprocessing.Pool()
+                def refine(ref):
+                    R = Refinement(ref[0], self.spsize, 'mqlib', ref[1])
+                    R.refineLevel()
+                    return R.solution, R.obj
+                outputs = pool.map(refine, inputs)
+                print(outputs)
+                exit()
+
+
             self.solution = R.solution
             self.obj = R.obj
     
