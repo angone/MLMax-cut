@@ -28,6 +28,11 @@ parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embeddi
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
+def parallel(ref):
+    R = Refinement(ref[0], self.spsize, 'mqlib', ref[1])
+    R.refineLevel()
+    return R.solution, R.obj
+
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape):
         self.G = G
@@ -502,11 +507,7 @@ class MaxcutSolver:
                 for x in noisySols:
                     inputs.append((E.G, x))
                 pool = multiprocessing.Pool()
-                def refine(ref):
-                    R = Refinement(ref[0], self.spsize, 'mqlib', ref[1])
-                    R.refineLevel()
-                    return R.solution, R.obj
-                outputs = pool.map(refine, inputs)
+                outputs = pool.map(parallel, inputs)
                 print(outputs)
                 exit()
 
