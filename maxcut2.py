@@ -500,8 +500,10 @@ class MaxcutSolver:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
+                self.solution = R.solution
+                self.obj = R.obj
             else:
-                noisySols = [self.noisySolution(0.2) for _ in range(39)]
+                noisySols = [self.noisySolution(0.2) for _ in range(40)]
                 noisySols.append(self.solution.copy())
                 inputs = []
                 for x in noisySols:
@@ -509,11 +511,16 @@ class MaxcutSolver:
                 pool = multiprocessing.Pool()
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
-                exit()
+                max_obj = outputs[0][1]
+                max_sol = outputs[0][0]
+                for O in outputs:
+                    if O[1] > max_obj:
+                        max_obj = O[1]
+                        max_sol = O[0]
+                self.solution = max_sol
+                self.obj
 
 
-            self.solution = R.solution
-            self.obj = R.obj
     
 s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
