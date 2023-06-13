@@ -277,7 +277,6 @@ class Refinement:
                         c += 1
         else:
             spsize = self.spsize
-            print(self.obj)
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
             self.passes += 1
