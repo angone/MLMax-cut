@@ -179,9 +179,9 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.25
-        self.randomness = 0
+        self.randomness = 1
         self.bound = 20
-        self.increase = 0.05
+        self.increase = -0.1
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -329,83 +329,6 @@ class Refinement:
 
         return (subprob, mapProbToSubProb, idx)
 
-    def SOCSubProb(self):
-        spnodes = []
-        used = set()
-        sandpile = {}
-        nodeq = Queue()
-        for x in range(self.G.numberOfNodes()):
-            sandpile[x] = random.randint(0, max(1,int(self.G.weightedDegree(x))-1))
-        while len(spnodes) < self.spsize:
-            j = -1
-            if len(self.posgain) > 0:
-                j = random.randint(0, len(self.posgain)-1)
-                i = self.posgain[j]
-            elif len(self.unused) > 0:
-                j = random.randint(0, len(self.unused)-1)
-                i = self.unused[j]
-            else:
-                i = random.randint(0, self.G.numberOfNodes()-1)
-            sandpile[i] += 1
-            k = sandpile[i]
-            d = int(self.G.weightedDegree(i))
-            if k > d:
-                nodeq.put(i)
-                while not nodeq.empty():
-                    u = nodeq.get()
-                    if u not in used:
-                        spnodes.append(u)
-                        used.add(u)
-                        if len(spnodes) > self.spsize:
-                            break
-                    sandpile[u] = sandpile[u] - int(self.G.weightedDegree(u))
-                    for v in self.G.iterNeighbors(u):
-                        if random.random() < 0.1:
-                            continue
-                        sandpile[v] += 1
-                        if sandpile[v] > int(self.G.weightedDegree(v)):
-                                nodeq.put(v)
-        subprob = nw.graph.Graph(n=self.spsize+2, weighted = True, directed = False)
-        mapProbToSubProb = {}
-        ct =0
-        i = 0
-        idx =0
-        change = set()
-        while i < self.spsize:
-            u = spnodes[i]
-            change.add(u)
-            self.uses[u] += 1
-            if u in self.unused:
-                self.unused.remove(u)
-            mapProbToSubProb[u] = idx
-            idx += 1
-            i += 1
-        self.last_subprob = spnodes
-
-
-        keys = mapProbToSubProb.keys()
-        total = 0
-        j = 0
-        while j < self.spsize:
-            u = spnodes[j]
-            spu = mapProbToSubProb[u]
-            for v, w in self.G.iterNeighborsWeights(u):
-                if v not in keys:
-                    if self.solution[v] == 0:
-                        spv = idx
-                    else:
-                        spv = idx + 1
-                    subprob.increaseWeight(spu, spv, w)
-                else:
-                    spv = mapProbToSubProb[v]
-                    if u < v:
-                        subprob.increaseWeight(spu, spv, w)
-                total += w
-            j += 1
-
-        subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-
-        return (subprob, mapProbToSubProb, idx)
 
     def refine(self):
         subprob = self.lockGainSubProb()
@@ -502,11 +425,11 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                noisySols = [self.noisySolution(0.2) for _ in range(40)]
-                noisySols.append(self.solution.copy())
-                inputs = []
-                for x in noisySols:
-                    inputs.append((E.G, x))
+                #noisySols = [self.noisySolution(0.2) for _ in range(40)]
+                #noisySols.append(self.solution.copy())
+                inputs = [(E.G, self.solution.copy()) for _ in range(40)]
+                #for x in noisySols:
+                #    inputs.append((E.G, x))
                 pool = multiprocessing.Pool()
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
@@ -517,7 +440,7 @@ class MaxcutSolver:
                         max_obj = O[1]
                         max_sol = O[0]
                 self.solution = max_sol
-                self.obj
+                self.obj = max_obj
 
 
     
