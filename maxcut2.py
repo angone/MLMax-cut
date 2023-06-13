@@ -508,7 +508,7 @@ class MaxcutSolver:
                     inputs.append((E.G, x))
                 pool = multiprocessing.Pool()
                 outputs = pool.map(parallel, inputs)
-                print(outputs)
+                print([outputs[i][1] for i in range(len(outputs))])
                 exit()
 
 
