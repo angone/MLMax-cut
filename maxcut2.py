@@ -372,7 +372,6 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        self.fixSolution()
         while self.passes < self.bound:
             self.refine()
         self.fixSolution()
