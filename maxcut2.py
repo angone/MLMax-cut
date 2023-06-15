@@ -29,6 +29,8 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
 def parallel(ref):
+    random.seed(ref[2])
+    np.random.seed(ref[2])
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
     return R.solution, R.obj
@@ -409,6 +411,7 @@ class MaxcutSolver:
         R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
+        starts = 40
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
@@ -425,11 +428,7 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                #noisySols = [self.noisySolution(0.2) for _ in range(40)]
-                #noisySols.append(self.solution.copy())
-                inputs = [(E.G, self.solution.copy()) for _ in range(40)]
-                #for x in noisySols:
-                #    inputs.append((E.G, x))
+                inputs = [(E.G, self.solution.copy(), i) for i in range(starts)]
                 pool = multiprocessing.Pool()
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
@@ -441,6 +440,11 @@ class MaxcutSolver:
                         max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
+                R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
+                s = R.mqlibSolve(t=5,G=E.G)
+                print('mqlib: ', R.calc_obj(E.G, s))
+                print('MLM:', self.obj)
+            starts = max(2, int(starts/2))
 
 
     
