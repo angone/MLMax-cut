@@ -182,7 +182,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 30
+        self.bound = 20
         self.increase = -0.1
 
     def refine_coarse(self):
@@ -263,11 +263,9 @@ class Refinement:
         if spnodes != None:
             spsize = len(spnodes)
         elif len(self.gainlist) >= self.spsize:
-            if self.randomness <= 0 and self.randomness > -1:
+            if self.randomness <= 0:
                 spnodes = self.gainlist[:self.spsize]
             else:
-                if self.randomness < -1:
-                    self.randomness = (self.randomness * -1) - 1
                 randomnodes = int(self.randomness * self.spsize)
                 spsize = self.spsize - randomnodes
                 spnodes = self.gainlist[:spsize]
@@ -354,7 +352,6 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
-        print("Objective at", self.n, "nodes:", self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
@@ -430,7 +427,10 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                inputs = [(E.G, self.solution.copy(), i) for i in range(starts)]
+                if True:
+                    inputs = [(E.G, self.noisySolution(0.2), j) for j in range(starts)]
+                else:
+                    inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool()
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
@@ -445,7 +445,7 @@ class MaxcutSolver:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 s = R.mqlibSolve(t=5,G=E.G)
                 print('mqlib: ', R.calc_obj(E.G, s))
-                print('MLM:', self.obj)
+                print('MLM:',self.obj)
             starts = max(2, int(starts/2))
 
 
