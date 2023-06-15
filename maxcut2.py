@@ -355,6 +355,7 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
+        self.test()
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
