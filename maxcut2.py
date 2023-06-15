@@ -182,7 +182,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 20
+        self.bound = 25
         self.increase = -0.1
 
     def refine_coarse(self):
@@ -263,10 +263,13 @@ class Refinement:
         if spnodes != None:
             spsize = len(spnodes)
         elif len(self.gainlist) >= self.spsize:
-            if self.randomness <= 0:
+            if self.randomness <= 0 and self.randomness > -1:
                 spnodes = self.gainlist[:self.spsize]
             else:
-                randomnodes = int(self.randomness * self.spsize)
+                if self.randomness <= -1:
+                    randomnodes = self.spsize
+                else:
+                    randomnodes = int(self.randomness * self.spsize)
                 spsize = self.spsize - randomnodes
                 spnodes = self.gainlist[:spsize]
                 used = set(spnodes)
@@ -427,7 +430,7 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                if True:
+                if False:
                     inputs = [(E.G, self.noisySolution(0.2), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
