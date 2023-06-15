@@ -182,7 +182,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 25
+        self.bound = 20
         self.increase = -0.1
 
     def refine_coarse(self):
