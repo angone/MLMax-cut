@@ -334,6 +334,25 @@ class Refinement:
 
         return (subprob, mapProbToSubProb, idx)
 
+    def fixSolution(self):
+        done = False
+        while not done:
+            done =  True
+            for i in range(self.n):
+                if self.gainmap[i] > 0:
+                    done = False
+                    self.solution[i] = 1 - self.solution[i]
+                    self.gainmap[i] = 0
+                    for v, w in self.G.iterNeighborsWeights(i):
+                        if self.solution[v] == self.solution[i]:
+                            self.gainmap[i] += w
+                            self.gainmap[v] += 2*w
+                        else:
+                            self.gainmap[i] -= w
+                            self.gainmap[v] -= 2*w
+        self.obj = self.calc_obj(self.G, self.solution)
+        return
+
 
     def refine(self):
         subprob = self.lockGainSubProb()
@@ -353,9 +372,11 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
+        self.fixSolution()
         while self.passes < self.bound:
             self.refine()
-        self.test()
+        self.fixSolution()
+        print("mqlib:", self.mqlibSolve(5, self.G),'mlm:', self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
