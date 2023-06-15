@@ -375,7 +375,7 @@ class Refinement:
         while self.passes < self.bound:
             self.refine()
         self.fixSolution()
-        print("mqlib:", self.mqlibSolve(5, self.G),'mlm:', self.obj)
+        print("mqlib:", self.calc_obj(self.G,self.mqlibSolve(5, self.G)),'mlm:', self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
