@@ -182,7 +182,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 20
+        self.bound = 30
         self.increase = -0.1
 
     def refine_coarse(self):
@@ -263,9 +263,11 @@ class Refinement:
         if spnodes != None:
             spsize = len(spnodes)
         elif len(self.gainlist) >= self.spsize:
-            if self.randomness <= 0:
+            if self.randomness <= 0 and self.randomness > -1:
                 spnodes = self.gainlist[:self.spsize]
             else:
+                if self.randomness < -1:
+                    self.randomness = (self.randomness * -1) - 1
                 randomnodes = int(self.randomness * self.spsize)
                 spsize = self.spsize - randomnodes
                 spnodes = self.gainlist[:spsize]
