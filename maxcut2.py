@@ -241,7 +241,8 @@ class Refinement:
             self.gainlist.remove(u)
             self.locked_nodes.add(u)
             self.gainmap[u] = 0
-            for v, w in self.G.iterNeighborsWeights(u):
+            for v in self.G.iterNeighbors(u):
+                w = self.G.weight(u,v)
                 if self.solution[u] == self.solution[v]:
                     self.gainmap[u] += w
                 else:
@@ -250,7 +251,8 @@ class Refinement:
                     self.gainlist.remove(v)
                     used.add(v)
                     self.gainmap[v] = 0
-                    for x, y in self.G.iterNeighborsWeights(v):
+                    for x in self.G.iterNeighbors(v):
+                        y = self.G.weight(x,v)
                         if x in self.locked_nodes:
                             y = y*(1+self.alpha)
                         if self.solution[v] == self.solution[x]:
