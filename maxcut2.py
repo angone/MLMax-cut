@@ -316,7 +316,8 @@ class Refinement:
         while j < len(spnodes):
             u = spnodes[j]
             spu = mapProbToSubProb[u]
-            for v, w in self.G.iterNeighborsWeights(u):
+            for v in self.G.iterNeighbors(u):
+                w = self.G.weight(u,v)
                 if v not in keys:
                     if self.solution[v] == 0:
                         spv = idx
