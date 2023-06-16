@@ -343,7 +343,8 @@ class Refinement:
                     done = False
                     self.solution[i] = 1 - self.solution[i]
                     self.gainmap[i] = 0
-                    for v, w in self.G.iterNeighborsWeights(i):
+                    for v in self.G.iterNeighbors(i):
+                        w = self.G.weight(v, i)
                         if self.solution[v] == self.solution[i]:
                             self.gainmap[i] += w
                             self.gainmap[v] += 2*w
