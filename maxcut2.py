@@ -470,9 +470,6 @@ class MaxcutSolver:
                         max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
-                R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
-                s = R.mqlibSolve(t=5,G=E.G)
-                print('mqlib: ', R.calc_obj(E.G, s))
                 print('MLM:',self.obj)
             starts = max(2, int(starts/2))
 
