@@ -366,7 +366,7 @@ class Refinement:
     def refine(self):
         subprob = self.lockGainSubProb()
         mapProbToSubProb = subprob[1]
-        S = self.mqlibSolve(0.25, subprob[0])
+        S = self.mqlibSolve(0.1, subprob[0])
         new_sol = self.solution.copy()
         
         keys = mapProbToSubProb.keys()
