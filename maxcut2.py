@@ -477,7 +477,7 @@ class MaxcutSolver:
                 self.obj = R.obj
             else:
                 if True:
-                    inputs = [(E.G, self.noisySolution(0.01), j) for j in range(starts)]
+                    inputs = [(E.G, self.noisySolution(0.05), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
@@ -491,7 +491,10 @@ class MaxcutSolver:
                         max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
+                R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
+                S = R.mqlibSolve(5, E.G)
                 print('Objective:',self.obj)
+                print("MQLib:", R.calc_obj(E.G,S))
             starts = max(2, int(starts/2))
 
 def get_max_memory_usage():
