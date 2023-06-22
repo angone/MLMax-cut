@@ -476,7 +476,7 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                if True:
+                if False:
                     inputs = [(E.G, self.noisySolution(0.01), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
