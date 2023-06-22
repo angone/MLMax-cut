@@ -189,6 +189,7 @@ class Refinement:
         self.randomness = 1
         self.bound = 20
         self.increase = -0.1
+        print(self.obj)
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
