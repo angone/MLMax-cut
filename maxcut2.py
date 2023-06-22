@@ -187,10 +187,9 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.25
-        self.randomness = 1
+        self.randomness = 0
         self.bound = 20
-        self.increase = -0.1
-        self.calls = 0
+        self.increase = 0
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -239,7 +238,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
+        
          
     def updateGain(self, S):
         used = set()
