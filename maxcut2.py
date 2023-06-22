@@ -181,7 +181,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.2
         self.randomness = 1
-        self.bound = 25
+        self.bound = 20
         self.increase = -0.1
         
     def refine_coarse(self):
@@ -232,8 +232,7 @@ class Refinement:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
         self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
-        
-         
+           
     def updateGain(self, S):
         used = set()
         if self.last_subprob == None:
@@ -259,8 +258,7 @@ class Refinement:
                         self.gainmap[v] -= w       
         for u in to_update:
             self.gainlist.add(u)
-        
-        
+         
     def lockGainSubProb(self, spnodes=None):
         if spnodes != None:
             spsize = len(spnodes)
@@ -363,7 +361,7 @@ class Refinement:
         while len(self.gainlist) > 0:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
-            S = self.mqlibSolve(0.1, subprob[0])
+            S = self.mqlibSolve(0.25, subprob[0])
             new_sol = self.solution.copy()
             
             keys = mapProbToSubProb.keys()
