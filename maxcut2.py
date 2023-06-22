@@ -248,8 +248,9 @@ class Refinement:
         changed = set()
         to_update = set()
         for u in self.last_subprob:
-            self.locked_nodes.add(u)
-            self.gainlist.remove(u)
+            if u not in self.locked_nodes:
+                self.gainlist.remove(u)
+                self.locked_nodes.add(u)
             if S[u] != self.solution[u]:
                 changed.add(u)
         for u in changed:
