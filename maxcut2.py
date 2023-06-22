@@ -30,15 +30,12 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
 def parallel(ref):
-    pr = cProfile.Profile()
-    pr.enable()
+
     s = int(ref[2] * time.perf_counter())
     random.seed(s)
     np.random.seed(s)
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
-    pr.disable()
-    pr.dump_stats(str(ref[0].numberOfNodes())+'_'+str(ref[2])+".process")
     return R.solution, R.obj
 
 class EmbeddingCoarsening:
@@ -61,11 +58,7 @@ class EmbeddingCoarsening:
             return -1 * o
         return obj
     
-    def dist(self, u, v):
-        a = 0
-        for i in range(self.d):
-            a += (self.space[u][i] - self.space[v][i])**2
-        return np.sqrt(a)
+
     
     def embed(self):
         n = self.G.numberOfNodes()
