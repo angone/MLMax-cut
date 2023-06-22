@@ -226,7 +226,7 @@ class Refinement:
         def f(s):
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
-        print(res)
+        print('mqlib:',res['objval'])
         return (res['solution']+1)/2 
 
     def buildGain(self):
@@ -374,6 +374,7 @@ class Refinement:
         for i in keys:
             new_sol[i] = S[mapProbToSubProb[i]]
         new_obj = self.calc_obj(self.G, new_sol)
+        print('calc_obj:',new_obj)
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol.copy()
