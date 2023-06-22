@@ -13,6 +13,7 @@ from sortedcontainers import SortedKeyList
 import logging
 import MQLib as mq
 import multiprocessing
+import cProfile
 
 T = 0
 random.seed(0)
@@ -29,10 +30,14 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
 def parallel(ref):
+    pr = cProfile.Profile()
+    pr.enable()
     random.seed(ref[2])
     np.random.seed(ref[2])
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
+    pr.disable()
+    pr.dump_stats(str(ref[2])+".process")
     return R.solution, R.obj
 
 class EmbeddingCoarsening:
@@ -463,7 +468,7 @@ class MaxcutSolver:
                 a = time.perf_counter()
                 pool = multiprocessing.Pool()
                 b = time.perf_counter()
-                T += (a-b)
+                T += (b-a)
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
