@@ -476,8 +476,8 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                if True:
-                    inputs = [(E.G, self.noisySolution(0.05), j) for j in range(starts)]
+                if False:
+                    inputs = [(E.G, self.noisySolution(0.50), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
