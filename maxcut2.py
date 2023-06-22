@@ -228,9 +228,6 @@ class Refinement:
         def f(s):
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
-        print('mqlib:',res['objval'])
-        S = (res['solution']+1)/2
-        print('mqlib calc obj:', self.calc_obj(G, S))
         return (res['solution']+1)/2 
 
     def buildGain(self):
@@ -377,8 +374,16 @@ class Refinement:
         keys = mapProbToSubProb.keys()
         for i in keys:
             new_sol[i] = S[mapProbToSubProb[i]]
+        for u in self.last_subprob:
+            if new_sol[u] != self.solution[u]:
+                for v in self.G.iterNeighbors(u):
+                    if new_sol[v] == new_sol[u]:
+                        self.obj -= self.G.weight(u,v)
+                    else:
+                        self.obj -= self.G.weight(u,v)
+        print('fast:'self.obj)
         new_obj = self.calc_obj(self.G, new_sol)
-        print('calc_obj:',new_obj)
+        print('slow:',new_obj)
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol.copy()
