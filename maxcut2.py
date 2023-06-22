@@ -14,7 +14,7 @@ import logging
 import MQLib as mq
 import multiprocessing
 import cProfile
-
+import resource
 T = 0
 random.seed(0)
 np.random.seed(0)
@@ -482,9 +482,9 @@ class MaxcutSolver:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 a = time.perf_counter()
                 pool = multiprocessing.Pool(processes=starts)
+                outputs = pool.map(parallel, inputs)
                 b = time.perf_counter()
                 T += (b-a)
-                outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
@@ -497,7 +497,11 @@ class MaxcutSolver:
                 print('MLM:',self.obj)
             starts = max(2, int(starts/2))
 
-
+def get_max_memory_usage():
+    max_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # Convert from kilobytes to megabytes
+    max_memory_mb = max_memory / 1024
+    return max_memory_mb
     
 s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
@@ -505,3 +509,8 @@ M.solve()
 t = time.perf_counter()
 print('Found obj', M.obj, 'in', t-s, 's')
 print(T)
+
+
+
+max_memory_usage = get_max_memory_usage()
+print(f"Maximum memory usage: {max_memory_usage} MB")
