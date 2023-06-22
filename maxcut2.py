@@ -226,6 +226,7 @@ class Refinement:
         def f(s):
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
+        print(res)
         return (res['solution']+1)/2 
 
     def buildGain(self):
