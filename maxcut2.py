@@ -189,11 +189,12 @@ class Refinement:
         self.randomness = 1
         self.bound = 20
         self.increase = -0.1
-        print(self.obj)
+        
 
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
+        print('after level:',self.obj)
     
     def terminate(self):
         for i in range(self.n):
@@ -388,7 +389,7 @@ class Refinement:
             self.refine()
         print('pre-fix:',self.obj)
         self.fixSolution()
-        print('obj:', self.obj)
+        print('after level:',self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
