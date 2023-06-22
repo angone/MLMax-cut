@@ -238,35 +238,35 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.1*x)
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
     
-    def updateGain(self):
+    def updateGain(self, S):
         used = set()
         if self.last_subprob == None:
             return
+        changed = set()
+        to_update = set()
         for u in self.last_subprob:
+            if S[u] != self.solution[u]:
+                changed.add(u)
+        for u in changed:
             self.gainlist.remove(u)
+            to_update.add(u)
             self.locked_nodes.add(u)
-            self.gainmap[u] = 0
             for v in self.G.iterNeighbors(u):
-                w = self.G.weight(u,v)
-                if self.solution[u] == self.solution[v]:
-                    self.gainmap[u] += w
-                else:
-                    self.gainmap[u] -= w
-                if v not in self.locked_nodes:
-                    self.gainlist.remove(v)
-                    used.add(v)
-                    self.gainmap[v] = 0
-                    for x in self.G.iterNeighbors(v):
-                        y = self.G.weight(x,v)
-                        if x in self.locked_nodes:
-                            y = y*(1+self.alpha)
-                        if self.solution[v] == self.solution[x]:
-                            self.gainmap[v] += y
-                        else:
-                            self.gainmap[v] -= y
-                    self.gainlist.add(v)
+                if v not in changed:
+                    if v not in to_update:
+                        to_update.add(v)
+                        self.gainlist.remove(v)
+                    w = 2*self.G.weight(u,v)*(1+self.alpha)
+                    if S[u] == S[v]:
+                        self.gainmap[v] += w
+                    else:
+                        self.gainmap[v] -= w
+        
+        for u in to_update:
+            self.gainlist.add(u)
+
         
     def lockGainSubProb(self, spnodes=None):
         if spnodes != None:
@@ -392,13 +392,15 @@ class Refinement:
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol.copy()
-        self.updateGain()
+            self.updateGain(new_sol)
 
     def refineLevel(self):
         ct = 0
         obj = 0
         while self.passes < self.bound:
             self.refine()
+            self.locked_nodes = set()
+            self.buildGain()
         self.fixSolution()
 
     def test(self):
