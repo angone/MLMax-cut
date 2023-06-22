@@ -37,7 +37,7 @@ def parallel(ref):
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
     pr.disable()
-    pr.dump_stats(str(ref[2])+".process")
+    pr.dump_stats(str(ref[0].numberOfNodes())+'_'+str(ref[2])+".process")
     return R.solution, R.obj
 
 class EmbeddingCoarsening:
