@@ -374,16 +374,21 @@ class Refinement:
         keys = mapProbToSubProb.keys()
         for i in keys:
             new_sol[i] = S[mapProbToSubProb[i]]
-        used = set()
+
+        changed = set()
         for u in self.last_subprob:
-            if new_sol[u] != self.solution[u]:
-                used.add(u)
-                for v in self.G.iterNeighbors(u):
-                    if v not in used:
-                        if new_sol[v] == new_sol[u]:
-                            self.obj -= self.G.weight(u,v)
-                        else:
-                            self.obj += self.G.weight(u,v)
+            if self.solution[u] != new_sol[u]:
+                changed.add(u)
+        for u in changed:
+            for v in self.G.iterNeighbors(u):
+                if v not in changed:
+                    w = self.G.weight(u,v)
+                    if new_sol[u] == new_sol[v]:
+                        self.obj -= w
+                    else:
+                        self.obj += w
+
+                    
         print('fast:',self.obj)
         new_obj = self.calc_obj(self.G, new_sol)
         print('slow:',new_obj)
