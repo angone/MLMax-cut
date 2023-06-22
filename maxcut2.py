@@ -476,7 +476,7 @@ class MaxcutSolver:
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            if True:
+            if False:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
@@ -487,11 +487,8 @@ class MaxcutSolver:
                     inputs = [(E.G, self.noisySolution(0.2), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
-                a = time.perf_counter()
                 pool = multiprocessing.Pool(processes=starts)
                 outputs = pool.map(parallel, inputs)
-                b = time.perf_counter()
-                T += (b-a)
                 print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
@@ -501,7 +498,7 @@ class MaxcutSolver:
                         max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
-                print('MLM:',self.obj)
+                print('Objective:',self.obj)
             starts = max(2, int(starts/2))
 
 def get_max_memory_usage():
@@ -515,7 +512,6 @@ M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
 print('Found obj', M.obj, 'in', t-s, 's')
-print(T)
 
 
 
