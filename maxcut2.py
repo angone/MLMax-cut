@@ -466,7 +466,7 @@ class MaxcutSolver:
         R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
-        starts = 128
+        starts = 256
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
@@ -483,13 +483,13 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                if False:
-                    inputs = [(E.G, self.noisySolution(0.2), j) for j in range(starts)]
+                if True:
+                    inputs = [(E.G, self.noisySolution(0.05), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
                 outputs = pool.map(parallel, inputs)
-                print([outputs[i][1] for i in range(len(outputs))])
+                #print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
                 for O in outputs:
