@@ -450,7 +450,7 @@ class MaxcutSolver:
             G = E.G
             fineToCoarse = E.mapFineToCoarse
             print(str(G), len(fineToCoarse))
-            print('processors:',multiprocessing.cpu_count)
+            print('processors:',multiprocessing.cpu_count())
             S = [0 for _ in range(G.numberOfNodes())]
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
