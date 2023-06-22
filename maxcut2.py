@@ -289,6 +289,8 @@ class Refinement:
                         used.add(self.gainlist[k])
                         c += 1
         else:
+            self.passes += 1
+            self.randomness += self.increase
             spsize = self.spsize
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
@@ -399,6 +401,8 @@ class Refinement:
         while self.passes < self.bound:
             self.refine()
             self.locked_nodes = set()
+            self.buildGain()
+            print('pass:',self.passes)
         self.fixSolution()
 
     def test(self):
