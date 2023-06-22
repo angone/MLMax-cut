@@ -393,8 +393,9 @@ class Refinement:
                 self.obj = new_obj
                 self.updateGain(new_sol)
                 self.solution = new_sol.copy()
-                
-            self.updateGain(self.solution)
+            else:
+                self.updateGain(self.solution)
+            print(self.gainlist)
 
 
     def refineLevel(self):
@@ -475,7 +476,7 @@ class MaxcutSolver:
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            if False:
+            if True:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
