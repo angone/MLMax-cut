@@ -229,6 +229,8 @@ class Refinement:
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
         print('mqlib:',res['objval'])
+        S = (res['solution']+1)/2
+        print('mqlib calc obj:', self.calc_obj(G, S))
         return (res['solution']+1)/2 
 
     def buildGain(self):
@@ -387,9 +389,7 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
-        print('pre-fix:',self.obj)
         self.fixSolution()
-        print('after level:',self.obj)
 
     def test(self):
         S = self.mqlibSolve(5, G=self.G)
