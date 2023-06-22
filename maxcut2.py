@@ -179,9 +179,9 @@ class Refinement:
         self.last_subprob = None
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
-        self.alpha = 0.50
-        self.randomness = 1
-        self.bound = 5
+        self.alpha = 0.2
+        self.randomness = 2
+        self.bound = 10
         self.increase = -0.4
         
     def refine_coarse(self):
@@ -268,7 +268,7 @@ class Refinement:
             if self.randomness <= 0 and self.randomness > -1:
                 spnodes = self.gainlist[:self.spsize]
             else:
-                if self.randomness <= -1:
+                if self.randomness <= -1 or self.randomness >= 1:
                     randomnodes = self.spsize
                 else:
                     randomnodes = int(self.randomness * self.spsize)
