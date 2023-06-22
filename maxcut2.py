@@ -379,19 +379,16 @@ class Refinement:
         for u in self.last_subprob:
             if self.solution[u] != new_sol[u]:
                 changed.add(u)
+        new_obj = self.obj
         for u in changed:
             for v in self.G.iterNeighbors(u):
                 if v not in changed:
                     w = self.G.weight(u,v)
                     if new_sol[u] == new_sol[v]:
-                        self.obj -= w
+                        new_obj -= w
                     else:
-                        self.obj += w
+                        new_obj += w
 
-                    
-        print('fast:',self.obj)
-        new_obj = self.calc_obj(self.G, new_sol)
-        print('slow:',new_obj)
         if new_obj >= self.obj:
             self.obj = new_obj
             self.solution = new_sol.copy()
