@@ -467,7 +467,7 @@ class MaxcutSolver:
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 a = time.perf_counter()
-                pool = multiprocessing.Pool()
+                pool = multiprocessing.Pool(processes=starts)
                 b = time.perf_counter()
                 T += (b-a)
                 outputs = pool.map(parallel, inputs)
