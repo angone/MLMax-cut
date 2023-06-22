@@ -390,8 +390,8 @@ class Refinement:
             if new_obj >= self.obj:
                 self.obj = new_obj
                 self.solution = new_sol.copy()
-            self.updateGain(new_sol)
-            print(self.gainlist)
+                self.updateGain(new_sol)
+
 
     def refineLevel(self):
         ct = 0
