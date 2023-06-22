@@ -284,7 +284,6 @@ class Refinement:
                     self.gainmap[u] -= w
                 if v not in self.locked_nodes:
                     self.gainlist.remove(v)
-                    used.add(v)
                     self.gainmap[v] = 0
                     for x in self.G.iterNeighbors(v):
                         y = self.G.weight(x,v)
