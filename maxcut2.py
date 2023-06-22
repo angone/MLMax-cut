@@ -492,9 +492,7 @@ class MaxcutSolver:
                 self.solution = max_sol
                 self.obj = max_obj
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
-                S = R.mqlibSolve(5, E.G)
                 print('Objective:',self.obj)
-                print("MQLib:", R.calc_obj(E.G,S))
             starts = max(2, int(starts/2))
 
 def get_max_memory_usage():
