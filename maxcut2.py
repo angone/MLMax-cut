@@ -248,10 +248,10 @@ class Refinement:
         to_update = set()
         for u in self.last_subprob:
             self.locked_nodes.add(u)
+            self.gainlist.remove(u)
             if S[u] != self.solution[u]:
                 changed.add(u)
         for u in changed:
-            self.gainlist.remove(u)
             for v in self.G.iterNeighbors(u):
                 if v not in changed:
                     if v not in to_update:
@@ -390,7 +390,8 @@ class Refinement:
             if new_obj >= self.obj:
                 self.obj = new_obj
                 self.solution = new_sol.copy()
-                self.updateGain(new_sol)
+            self.updateGain(new_sol)
+            print(self.gainlist)
 
     def refineLevel(self):
         ct = 0
