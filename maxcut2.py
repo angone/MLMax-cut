@@ -14,7 +14,7 @@ import logging
 import MQLib as mq
 import multiprocessing
 
-
+T = 0
 random.seed(0)
 np.random.seed(0)
 faulthandler.enable()
@@ -426,6 +426,7 @@ class MaxcutSolver:
         return S
     
     def solve(self):
+        global T
         G = self.problem_graph
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube')
@@ -459,7 +460,10 @@ class MaxcutSolver:
                     inputs = [(E.G, self.noisySolution(0.2), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
+                a = time.perf_counter()
                 pool = multiprocessing.Pool()
+                b = time.perf_counter()
+                T += (a-b)
                 outputs = pool.map(parallel, inputs)
                 print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
@@ -480,3 +484,4 @@ M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
 print('Found obj', M.obj, 'in', t-s, 's')
+print(T)
