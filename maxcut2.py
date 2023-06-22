@@ -180,9 +180,9 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.2
-        self.randomness = 2
-        self.bound = 10
-        self.increase = -0.4
+        self.randomness = 1
+        self.bound = 25
+        self.increase = -0.1
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
