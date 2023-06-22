@@ -385,6 +385,7 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
+        print('pre-fix:',self.obj)
         self.fixSolution()
         print('obj:', self.obj)
 
