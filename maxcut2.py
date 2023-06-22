@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 def parallel(ref):
 
-    s = int(ref[2] * time.perf_counter())
+    s = int(ref[2])
     random.seed(s)
     np.random.seed(s)
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
@@ -476,7 +476,7 @@ class MaxcutSolver:
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                if False:
+                if True:
                     inputs = [(E.G, self.noisySolution(0.01), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
