@@ -179,7 +179,7 @@ class Refinement:
         self.last_subprob = None
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
-        self.alpha = 0.25
+        self.alpha = 0.50
         self.randomness = 1
         self.bound = 5
         self.increase = -0.4
