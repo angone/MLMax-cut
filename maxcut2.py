@@ -465,12 +465,11 @@ class MaxcutSolver:
             G = E.G
             fineToCoarse = E.mapFineToCoarse
             print(str(G), len(fineToCoarse))
-            print('processors:',multiprocessing.cpu_count())
             S = [0 for _ in range(G.numberOfNodes())]
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            if True:
+            if False:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
