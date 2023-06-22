@@ -238,7 +238,8 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.1*x)
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
+        
     
     def updateGain(self, S):
         used = set()
@@ -294,7 +295,6 @@ class Refinement:
             spsize = self.spsize
             spnodes = self.gainlist[:len(self.gainlist)-1]
             used = set(spnodes)
-            self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.0001*x)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, self.G.numberOfNodes()-1)
                 if k not in used:
