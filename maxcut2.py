@@ -381,7 +381,7 @@ class Refinement:
                         self.obj -= self.G.weight(u,v)
                     else:
                         self.obj -= self.G.weight(u,v)
-        print('fast:'self.obj)
+        print('fast:',self.obj)
         new_obj = self.calc_obj(self.G, new_sol)
         print('slow:',new_obj)
         if new_obj >= self.obj:
