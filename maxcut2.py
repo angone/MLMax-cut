@@ -253,16 +253,16 @@ class Refinement:
                 changed.add(u)
         for u in changed:
             for v in self.G.iterNeighbors(u):
-                if v not in changed:
-                    if v not in self.locked_nodes and v not in to_update:
+                if v not in self.locked_nodes:
+                    if v not in to_update:
                         to_update.add(v)
+                    if v in self.gainlist:
                         self.gainlist.remove(v)
                     w = 2*self.G.weight(u,v)*(1+self.alpha)
                     if S[u] == S[v]:
                         self.gainmap[v] += w
                     else:
-                        self.gainmap[v] -= w
-        
+                        self.gainmap[v] -= w       
         for u in to_update:
             self.gainlist.add(u)
         
