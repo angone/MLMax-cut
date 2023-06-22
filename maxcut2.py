@@ -188,8 +188,8 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 25
-        self.increase = -0.1
+        self.bound = 10
+        self.increase = -0.2
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -484,7 +484,7 @@ class MaxcutSolver:
                 self.obj = R.obj
             else:
                 if True:
-                    inputs = [(E.G, self.noisySolution(0.05), j) for j in range(starts)]
+                    inputs = [(E.G, self.noisySolution(0.01), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
