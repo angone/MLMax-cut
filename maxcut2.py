@@ -195,7 +195,7 @@ class Refinement:
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
-        print('after level:',self.obj)
+        print('Coarse Level:',self.obj)
     
     def terminate(self):
         for i in range(self.n):
@@ -397,7 +397,6 @@ class Refinement:
                 self.solution = new_sol.copy()
             else:
                 self.updateGain(self.solution)
-            print(self.gainlist)
 
 
     def refineLevel(self):
@@ -407,7 +406,6 @@ class Refinement:
             self.refine()
             self.locked_nodes = set()
             self.buildGain()
-            print('pass:',self.passes)
         self.fixSolution()
 
     def test(self):
@@ -457,6 +455,7 @@ class MaxcutSolver:
     def solve(self):
         global T
         G = self.problem_graph
+        print(G)
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube')
             E.coarsen()
@@ -473,12 +472,12 @@ class MaxcutSolver:
             E = self.hierarchy[i]
             G = E.G
             fineToCoarse = E.mapFineToCoarse
-            print(str(G), len(fineToCoarse))
+            print('Level',i+1,'Nodes:',G.numberOfNodes(),'Edges:',G.numberOfEdges())
             S = [0 for _ in range(G.numberOfNodes())]
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            if True:
+            if False:
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
