@@ -378,9 +378,9 @@ class Refinement:
             if new_sol[u] != self.solution[u]:
                 for v in self.G.iterNeighbors(u):
                     if new_sol[v] == new_sol[u]:
-                        self.obj -= self.G.weight(u,v)
+                        self.obj -= 2*self.G.weight(u,v)
                     else:
-                        self.obj += self.G.weight(u,v)
+                        self.obj += 2*self.G.weight(u,v)
         print('fast:',self.obj)
         new_obj = self.calc_obj(self.G, new_sol)
         print('slow:',new_obj)
