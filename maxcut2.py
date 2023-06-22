@@ -504,7 +504,7 @@ s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
-print('Found obj', M.obj, 'in', t-s, 's')
+print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
 
 
 
