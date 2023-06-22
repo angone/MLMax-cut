@@ -293,7 +293,7 @@ class Refinement:
             self.passes += 1
             self.randomness += self.increase
             spsize = self.spsize
-            spnodes = self.gainlist[:len(self.gainlist)-1]
+            spnodes = self.gainlist[:len(self.gainlist)]
             used = set(spnodes)
             while len(spnodes) < self.spsize:
                 k = random.randint(0, self.G.numberOfNodes()-1)
