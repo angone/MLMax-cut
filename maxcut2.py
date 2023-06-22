@@ -188,8 +188,8 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.25
         self.randomness = 1
-        self.bound = 10
-        self.increase = -0.2
+        self.bound = 5
+        self.increase = -0.4
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
