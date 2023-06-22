@@ -238,6 +238,7 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
         
          
     def updateGain(self, S):
