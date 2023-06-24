@@ -180,8 +180,8 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.2
-        self.randomness = 2
-        self.bound = 4
+        self.randomness = 1
+        self.bound = 2
         self.increase = -1
         
     def refine_coarse(self):
