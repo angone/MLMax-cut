@@ -457,7 +457,7 @@ class MaxcutSolver:
         R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
-        starts = 256
+        starts = 100
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
