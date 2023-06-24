@@ -180,9 +180,9 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.2
-        self.randomness = 1
-        self.bound = 20
-        self.increase = -0.1
+        self.randomness = 2
+        self.bound = 4
+        self.increase = -1
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
@@ -202,7 +202,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t, G=None):
+    def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -263,10 +263,10 @@ class Refinement:
         if spnodes != None:
             spsize = len(spnodes)
         elif len(self.gainlist) >= self.spsize:
-            if self.randomness <= 0 and self.randomness > -1:
+            if self.randomness <= 0:
                 spnodes = self.gainlist[:self.spsize]
             else:
-                if self.randomness <= -1 or self.randomness >= 1:
+                if self.randomness >= 1:
                     randomnodes = self.spsize
                 else:
                     randomnodes = int(self.randomness * self.spsize)
@@ -361,7 +361,7 @@ class Refinement:
         while len(self.gainlist) > 0:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
-            S = self.mqlibSolve(0.25, subprob[0])
+            S = self.mqlibSolve(G=subprob[0])
             new_sol = self.solution.copy()
             
             keys = mapProbToSubProb.keys()
