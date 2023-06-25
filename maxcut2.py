@@ -48,6 +48,16 @@ def parallelEmbed(ref):
     res = minimize(ref[1], p, bounds=bnds, tol=0.0001, constraints=cons)
     return res.x
 
+def buildObj(u):
+    def obj(pos):
+        o = 0
+        for x in self.G.iterNeighbors(u):
+            temp = 0
+            for i in range(self.d):
+                temp += (pos[i] - self.space[x][i])**2
+            o += ((temp)*self.G.weight(u,x))
+        return -1 * o
+    return obj
 
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape):
@@ -58,23 +68,14 @@ class EmbeddingCoarsening:
         self.shape = shape
         self.M = set()
 
-    def buildObj(self, u):
-        def obj(pos):
-            o = 0
-            for x in self.G.iterNeighbors(u):
-                temp = 0
-                for i in range(self.d):
-                    temp += (pos[i] - self.space[x][i])**2
-                o += ((temp)*self.G.weight(u,x))
-            return -1 * o
-        return obj
+
     
 
     
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        inputs = [(i, self.buildObj(i)) for i in range(n)]
+        inputs = [i for i in range(n)]
         '''for i in range(n):
             b = self.buildObj(i)
             bnds = [(0,1) for _ in range(self.d)]
