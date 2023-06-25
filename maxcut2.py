@@ -29,7 +29,7 @@ parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embeddi
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
-def parallel(ref):
+def parallelRefine(ref):
 
     s = int(ref[2])
     random.seed(s)
@@ -37,6 +37,17 @@ def parallel(ref):
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
     return R.solution, R.obj
+
+def parallelEmbed(ref):
+    d = 3
+    bnds = [(0,1) for _ in range(d)]
+    p = [random.random() for _ in range(d)]
+    def sphere(x):
+        return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
+    cons = [{'type': 'ineq', 'fun': sphere}] #if self.shape == 'sphere' else None
+    res = minimize(ref[1], p, bounds=bnds, tol=0.0001, constraints=cons)
+    return res.x
+
 
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape):
@@ -63,7 +74,8 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        for i in range(n):
+        inputs = [(i, self.buildObj(i)) for i in range(n)]
+        '''for i in range(n):
             b = self.buildObj(i)
             bnds = [(0,1) for _ in range(self.d)]
             p = [random.random() for _ in range(self.d)]
@@ -71,7 +83,11 @@ class EmbeddingCoarsening:
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
             res = minimize(b, p, bounds=bnds, tol=0.0001, constraints=cons)
-            self.space[i] = res.x 
+            self.space[i] = res.x '''
+        pool = multiprocessing.Pool(processes=40)
+        outputs = pool.map(parallelEmbed, inputs)
+        for i in range(len(outputs)):
+            self.space[i] = outputs[i]
     
     def match(self):
         n = self.G.numberOfNodes()
@@ -479,7 +495,7 @@ class MaxcutSolver:
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
-                outputs = pool.map(parallel, inputs)
+                outputs = pool.map(parallelRefine, inputs)
                 #print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
