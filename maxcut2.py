@@ -30,7 +30,6 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
 def parallelRefine(ref):
-
     s = int(ref[2])
     random.seed(s)
     np.random.seed(s)
@@ -57,7 +56,7 @@ def buildObj(u, G, d, space):
         for x in G.iterNeighbors(u):
             temp = 0
             for i in range(d):
-                temp += (pos[i] - space[x][i])**2
+                temp += np.abs(pos[i] - space[x][i])
             o += ((temp)*G.weight(u,x))
         return -1 * o
     return obj
@@ -76,7 +75,7 @@ class EmbeddingCoarsening:
         n = self.G.numberOfNodes()
         embeddings = []
         inputs = [(i, self.G, self.space) for i in range(n)]
-        pool = multiprocessing.Pool(processes=40)
+        pool = multiprocessing.Pool()
         outputs = pool.map(parallelEmbed, inputs)
         for i in range(len(outputs)):
             self.space[i] = outputs[i]
