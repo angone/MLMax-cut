@@ -492,7 +492,6 @@ class MaxcutSolver:
                 print('Objective:',self.obj)
             starts = max(2, int(starts/2))
         self.end = time.perf_counter()
-        print(R.calc_obj(self.G, R.mqlibSolve(t=(self.end-self.start),G=self.G)))
 
 def get_max_memory_usage():
     max_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
