@@ -29,37 +29,14 @@ parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embeddi
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 
-def parallelRefine(ref):
+def parallel(ref):
+
     s = int(ref[2])
     random.seed(s)
     np.random.seed(s)
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
     R.refineLevel()
     return R.solution, R.obj
-
-def parallelEmbed(ref):
-    d = 3
-    i = ref[0]
-    G = ref[1]
-    space = ref[2]
- #   bnds = [(0,1) for _ in range(d)]
-    p = [random.random() for _ in range(d)]
-    def sphere(x):
-        return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-    cons = [{'type': 'ineq', 'fun': sphere}] if True else None
-    res = minimize(buildObj(i, G, d, space), p, tol=0.001, constraints=cons)
-    return res.x
-
-def buildObj(u, G, d, space):
-    def obj(pos):
-        o = 0
-        for x in G.iterNeighbors(u):
-            temp = 0
-            for i in range(d):
-                temp += np.abs(pos[i] - space[x][i])
-            o += ((temp)*G.weight(u,x))
-        return -1 * o
-    return obj
 
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape):
@@ -70,15 +47,31 @@ class EmbeddingCoarsening:
         self.shape = shape
         self.M = set()
 
+    def buildObj(self, u):
+        def obj(pos):
+            o = 0
+            for x in self.G.iterNeighbors(u):
+                temp = 0
+                for i in range(self.d):
+                    temp += (pos[i] - self.space[x][i])**2
+                o += ((temp)*self.G.weight(u,x))
+            return -1 * o
+        return obj
+    
+
     
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        inputs = [(i, self.G, self.space) for i in range(n)]
-        pool = multiprocessing.Pool()
-        outputs = pool.map(parallelEmbed, inputs)
-        for i in range(len(outputs)):
-            self.space[i] = outputs[i]
+        for i in range(n):
+            b = self.buildObj(i)
+            bnds = [(0,1) for _ in range(self.d)]
+            p = [random.random() for _ in range(self.d)]
+            def sphere(x):
+                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
+            cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
+            res = minimize(b, p, bounds=bnds, tol=0.0001, constraints=cons)
+            self.space[i] = res.x 
     
     def match(self):
         n = self.G.numberOfNodes()
@@ -153,8 +146,7 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        for i in range(self.d):
-            self.embed()
+        self.embed()
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
@@ -454,15 +446,12 @@ class MaxcutSolver:
         global T
         G = self.problem_graph
         print(G)
-        t1 = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
             G = E.cG
-        t2 = time.perf_counter()
-        print(t2-t1, 's spent coarsening')
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         R.refine_coarse()
@@ -490,7 +479,7 @@ class MaxcutSolver:
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 pool = multiprocessing.Pool(processes=starts)
-                outputs = pool.map(parallelRefine, inputs)
+                outputs = pool.map(parallel, inputs)
                 #print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
