@@ -455,7 +455,7 @@ class MaxcutSolver:
         G = self.problem_graph
         print(G)
         while G.numberOfNodes() > 2*self.spsize:
-            E = EmbeddingCoarsening(G, 3,'cube')
+            E = EmbeddingCoarsening(G, 5,'cube')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
