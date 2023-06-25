@@ -47,7 +47,7 @@ def parallelEmbed(ref):
     def sphere(x):
         return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
     cons = [{'type': 'ineq', 'fun': sphere}] if True else None
-    res = minimize(buildObj(i, G, d, space), p, bounds=bnds, tol=0.001, constraints=cons)
+    res = minimize(buildObj(i, G, d, space), p, tol=0.001, constraints=cons)
     return res.x
 
 def buildObj(u, G, d, space):
