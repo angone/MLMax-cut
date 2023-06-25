@@ -47,7 +47,7 @@ def parallelEmbed(ref):
     p = [random.random() for _ in range(d)]
     def sphere(x):
         return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-    cons = [{'type': 'ineq', 'fun': sphere}] #if self.shape == 'sphere' else None
+    cons = [{'type': 'ineq', 'fun': sphere}] if False else None
     res = minimize(buildObj(i, G, d, space), p, bounds=bnds, tol=0.0001, constraints=cons)
     return res.x
 
