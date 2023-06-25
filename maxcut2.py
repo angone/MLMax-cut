@@ -42,21 +42,22 @@ def parallelEmbed(ref):
     d = 3
     i = ref[0]
     G = ref[1]
+    space = ref[2]
     bnds = [(0,1) for _ in range(d)]
     p = [random.random() for _ in range(d)]
     def sphere(x):
         return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
     cons = [{'type': 'ineq', 'fun': sphere}] #if self.shape == 'sphere' else None
-    res = minimize(buildObj(i, G, d), p, bounds=bnds, tol=0.0001, constraints=cons)
+    res = minimize(buildObj(i, G, d, space), p, bounds=bnds, tol=0.0001, constraints=cons)
     return res.x
 
-def buildObj(u, G, d):
+def buildObj(u, G, d, space):
     def obj(pos):
         o = 0
         for x in G.iterNeighbors(u):
             temp = 0
             for i in range(d):
-                temp += (pos[i] - self.space[x][i])**2
+                temp += (pos[i] - space[x][i])**2
             o += ((temp)*G.weight(u,x))
         return -1 * o
     return obj
@@ -74,7 +75,7 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        inputs = [(i, self.G) for i in range(n)]
+        inputs = [(i, self.G, self.space) for i in range(n)]
         '''for i in range(n):
             b = self.buildObj(i)
             bnds = [(0,1) for _ in range(self.d)]
