@@ -82,7 +82,6 @@ class EmbeddingCoarsening:
         clusters = []
         singletons = []
         t = 0
-
         for x in ind:
             if x[0] in used:
                 continue
@@ -107,8 +106,8 @@ class EmbeddingCoarsening:
         k = len(singletons)
         if k % 2 == 1:
             k = k-1
-            R = singletons[k]
-            used.add(R)
+            self.R = singletons[k]
+            used.add(self.R)
         if k == 0:
             return
         for i in range(k):
@@ -137,7 +136,6 @@ class EmbeddingCoarsening:
         
         for i in range(int(m/2)):
             self.M.add((unused[2*i], unused[2*i + 1]))
-        self.R = R
 
     def coarsen(self):
         n = self.G.numberOfNodes()
