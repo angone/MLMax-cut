@@ -39,7 +39,7 @@ def parallelRefine(ref):
     return R.solution, R.obj
 
 def parallelEmbed(ref):
-    d = 3
+    d = 5
     i = ref[0]
     G = ref[1]
     space = ref[2]
@@ -48,7 +48,7 @@ def parallelEmbed(ref):
     def sphere(x):
         return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
     cons = [{'type': 'ineq', 'fun': sphere}] if False else None
-    res = minimize(buildObj(i, G, d, space), p, bounds=bnds, tol=0.0001, constraints=cons)
+    res = minimize(buildObj(i, G, d, space), p, bounds=bnds, tol=0.001, constraints=cons)
     return res.x
 
 def buildObj(u, G, d, space):
@@ -76,15 +76,6 @@ class EmbeddingCoarsening:
         n = self.G.numberOfNodes()
         embeddings = []
         inputs = [(i, self.G, self.space) for i in range(n)]
-        '''for i in range(n):
-            b = self.buildObj(i)
-            bnds = [(0,1) for _ in range(self.d)]
-            p = [random.random() for _ in range(self.d)]
-            def sphere(x):
-                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
-            res = minimize(b, p, bounds=bnds, tol=0.0001, constraints=cons)
-            self.space[i] = res.x '''
         pool = multiprocessing.Pool(processes=40)
         outputs = pool.map(parallelEmbed, inputs)
         for i in range(len(outputs)):
