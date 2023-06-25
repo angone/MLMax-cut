@@ -46,6 +46,7 @@ class EmbeddingCoarsening:
         self.space = np.random.rand(self.n, d)
         self.shape = shape
         self.M = set()
+        self.R = -1
 
     def buildObj(self, u):
         def obj(pos):
@@ -103,7 +104,6 @@ class EmbeddingCoarsening:
                 used.add(c[2*i+1])
         indices = []
         newspace = []
-        R = -1
         k = len(singletons)
         if k % 2 == 1:
             k = k-1
