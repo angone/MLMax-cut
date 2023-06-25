@@ -434,6 +434,7 @@ class MaxcutSolver:
         self.solver = solver
         self.solution = None
         self.obj = 0
+        self.start = time.perf_counter()
     
     def noisySolution(self, ratio):
         S = self.solution.copy()
@@ -492,6 +493,8 @@ class MaxcutSolver:
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
             starts = max(2, int(starts/2))
+        self.end = time.perf_counter()
+        R.mqlibSolve(t=(self.end-self.start),G=self.G)
 
 def get_max_memory_usage():
     max_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -499,12 +502,12 @@ def get_max_memory_usage():
     max_memory_mb = max_memory / 1024
     return max_memory_mb
     
-s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
 print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
-
+if (t-s) < 1000:
+    print()
 
 
 max_memory_usage = get_max_memory_usage()
