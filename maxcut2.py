@@ -39,7 +39,7 @@ def parallelRefine(ref):
     return R.solution, R.obj
 
 def parallelEmbed(ref):
-    d = 5
+    d = 7
     i = ref[0]
     G = ref[1]
     space = ref[2]
@@ -154,7 +154,8 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        self.embed()
+        for i in range(self.d):
+            self.embed()
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
@@ -455,7 +456,7 @@ class MaxcutSolver:
         G = self.problem_graph
         print(G)
         while G.numberOfNodes() > 2*self.spsize:
-            E = EmbeddingCoarsening(G, 5,'cube')
+            E = EmbeddingCoarsening(G, 7,'cube')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
