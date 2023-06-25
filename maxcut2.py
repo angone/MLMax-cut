@@ -42,7 +42,7 @@ def parallelEmbed(ref):
     i = ref[0]
     G = ref[1]
     space = ref[2]
-    bnds = [(0,1) for _ in range(d)]
+ #   bnds = [(0,1) for _ in range(d)]
     p = [random.random() for _ in range(d)]
     def sphere(x):
         return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
