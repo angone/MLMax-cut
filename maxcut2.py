@@ -498,7 +498,7 @@ def get_max_memory_usage():
     # Convert from kilobytes to megabytes
     max_memory_mb = max_memory / 1024
     return max_memory_mb
-    
+s = time.perf_counter()
 M = MaxcutSolver(args.g, args.sp, args.S)
 M.solve()
 t = time.perf_counter()
