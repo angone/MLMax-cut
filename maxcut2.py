@@ -28,7 +28,7 @@ parser.add_argument("-f", type = str, default = "elist", help = "graph format")
 parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
-
+sptime = 0
 def parallel(ref):
 
     s = int(ref[2])
@@ -442,7 +442,7 @@ class MaxcutSolver:
         return S
     
     def solve(self):
-        global T
+        global sptime
         G = self.problem_graph
         print(G)
         while G.numberOfNodes() > 2*self.spsize:
@@ -477,8 +477,10 @@ class MaxcutSolver:
                     inputs = [(E.G, self.noisySolution(0.50), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
-                pool = multiprocessing.Pool(processes=starts)
+                pool = multiprocessing.Pool()
+                sptime -= time.perf_counter()
                 outputs = pool.map(parallel, inputs)
+                sptime += time.perf_counter()
                 #print([outputs[i][1] for i in range(len(outputs))])
                 max_obj = outputs[0][1]
                 max_sol = outputs[0][0]
