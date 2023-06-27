@@ -144,7 +144,8 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        self.embed()
+        for _ in range(self.d):
+            self.embed()
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
