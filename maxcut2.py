@@ -66,7 +66,7 @@ class EmbeddingCoarsening:
         embeddings = []
         for i in range(n):
             b = self.buildObj(i)
-            bnds = [(-1,1) for _ in range(self.d)]
+            bnds = [(0,1) for _ in range(self.d)]
             p = [self.space[i][j] for j in range(self.d)]
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
