@@ -66,12 +66,12 @@ class EmbeddingCoarsening:
         embeddings = []
         for i in range(n):
             b = self.buildObj(i)
-            bnds = [(0,1) for _ in range(self.d)]
-            p = [random.random() for _ in range(self.d)]
+            bnds = [(-1,1) for _ in range(self.d)]
+            p = [self.space[i][j] for j in range(self.d)]
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
-            res = minimize(b, p, bounds=bnds, tol=0.0001, constraints=cons)
+            res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
             self.space[i] = res.x 
     
     def match(self):
