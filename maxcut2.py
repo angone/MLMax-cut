@@ -446,12 +446,16 @@ class MaxcutSolver:
         global sptime
         G = self.problem_graph
         print(G)
+        p = cProfile.Profile()
+        p.enable()
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
             G = E.cG
+        p.disable()
+        p.print_stats()
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         R.refine_coarse()
