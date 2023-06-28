@@ -455,7 +455,8 @@ class MaxcutSolver:
             self.hierarchy.append(E)
             G = E.cG
         p.disable()
-        p.print_stats()
+        p.dump_stats("benchmark.out")
+
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         R.refine_coarse()
