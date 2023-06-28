@@ -357,7 +357,7 @@ class Refinement:
 
 
     def refine(self):
-        while len(self.gainlist) > 0 and self.gainlist[0] >= 0:
+        while len(self.gainlist) > 0:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
             S = self.mqlibSolve(G=subprob[0])
