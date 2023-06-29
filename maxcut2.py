@@ -49,13 +49,13 @@ class EmbeddingCoarsening:
         self.R = -1
     
     def buildObj(self):
-        def obj(space):
+        def obj(p):
             o = 0
-            for u, v in self.G.iterEdgesWeights():
+            for u, v,w in self.G.iterEdgesWeights():
                 temp = 0
                 for i in range(self.d):
-                    temp += (space[u][i] - space[v][i])**2
-                o += temp*self.G.weight(u,v)
+                    temp += (p[self.d*u+i] - p[self.d*v+i])**2
+                o += temp*w
             return -1 * o
         return obj
 
