@@ -47,32 +47,31 @@ class EmbeddingCoarsening:
         self.shape = shape
         self.M = set()
         self.R = -1
-
-    def buildObj(self, u):
-        def obj(pos):
+    
+    def buildObj(self):
+        def obj(space):
             o = 0
-            for x in self.G.iterNeighbors(u):
+            for u, v in self.G.iterEdgesWeights():
                 temp = 0
                 for i in range(self.d):
-                    temp += (pos[i] - self.space[x][i])**2
-                o += ((temp)*self.G.weight(u,x))
+                    temp += (space[u][i] - space[v][i])**2
+                o += temp*self.G.weight(u,v)
             return -1 * o
         return obj
-    
+
 
     
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        for i in range(n):
-            b = self.buildObj(i)
-            bnds = [(-1,1) for _ in range(self.d)]
-            p = [self.space[i][j] for j in range(self.d)]
-            def sphere(x):
-                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
-            res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
-            self.space[i] = res.x 
+        b = self.buildObj()
+        bnds = [[(-1,1) for _ in range(self.d)] for _ in range(n)]
+        p = [[self.space[i][j] for j in range(self.d)] for i in range(n)]
+        def sphere(x):
+            return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
+        cons = [{'type': 'ineq', 'fun': sphere}] if not self.shape == 'sphere' else None
+        res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
+        self.space = res.x 
     
     def match(self):
         n = self.G.numberOfNodes()
