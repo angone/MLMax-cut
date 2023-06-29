@@ -65,8 +65,8 @@ class EmbeddingCoarsening:
         n = self.G.numberOfNodes()
         embeddings = []
         b = self.buildObj()
-        bnds = [[(-1,1),(-1,1),(-1,1)]] * n
-        p = [[self.space[i][j] for j in range(self.d)] for i in range(n)]
+        bnds = [(-1,1) for _ in range(self.d*n)]
+        p = [self.space[i][j] for j in range(self.d) for i in range(n)]
         def sphere(x):
             return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
         
@@ -144,8 +144,7 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        for _ in range(self.d):
-            self.embed()
+        self.embed()
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
