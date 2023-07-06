@@ -181,7 +181,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.2
         self.randomness = 1
-        self.bound = 2
+        self.bound = 3
         self.increase = -1
         
     def refine_coarse(self):
@@ -398,31 +398,6 @@ class Refinement:
             self.buildGain()
         self.fixSolution()
 
-    def test(self):
-        S = self.mqlibSolve(5, G=self.G)
-        O = self.calc_obj(self.G, S)
-        print("MQLib:",O)
-        print("MLM:", self.obj)
-        spnodes = []
-        ct = 0
-        for i in range(self.n):
-            if S[i] == self.solution[i]:
-                spnodes.append(i)
-                ct += 1
-        print("diff:", ct)
-        if ct > 2:
-            subprob = self.lockGainSubProb(spnodes)
-            mapProbToSubProb = subprob[1]
-            S2 = self.mqlibSolve(5, subprob[0])
-            new_sol = self.solution.copy()
-        
-            keys = mapProbToSubProb.keys()
-            for i in keys:
-                new_sol[i] = S2[mapProbToSubProb[i]]
-            new_obj = self.calc_obj(self.G, new_sol)
-            print("after sp:",new_obj)
-        print(subprob)
-        print(self.gainmap)
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
@@ -447,23 +422,21 @@ class MaxcutSolver:
         global sptime
         G = self.problem_graph
         print(G)
-        p = cProfile.Profile()
-        p.enable()
+
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
             G = E.cG
-        p.disable()
-        p.dump_stats("benchmark.out")
+
 
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
-        starts = 40
+        starts = 50
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
             G = E.G
