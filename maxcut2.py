@@ -15,6 +15,12 @@ import MQLib as mq
 import multiprocessing
 import cProfile
 import resource
+from qiskit_optimization import QuadraticProgram
+from qiskit.algorithms.optimizers import COBYLA
+from qiskit import BasicAer
+from qiskit.algorithms import QAOA
+from qiskit_optimization.algorithms import MinimumEigenOptimizer
+
 T = 0
 random.seed(0)
 np.random.seed(0)
@@ -223,6 +229,34 @@ class Refinement:
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
         return (res['solution']+1)/2 
 
+    def qaoa(self, p=3):
+        n = self.G.numberOfNodes()
+        G = nw.nxadapter.nk2nx(G)
+        w = nx.adjacency_matrix(G)
+        problem = QuadraticProgram()
+        _ = [problem.binary_var(f"x{i}") for i in range(n)]
+        linear = w.dot(np.ones(n))
+        quadratic = -w
+        problem.maximize(linear=linear, quadratic=quadratic)
+        c = [1]
+        for _ in range(n-1):
+            c.append(0)
+        problem.linear_constraint(c, '==', 1)
+        cobyla = COBYLA()
+        backend = BasicAer.get_backend('qasm_simulator')
+        qaoa = QAOA(optimizer=cobyla, reps=p, quantum_instance=backend)
+        algorithm=MinimumEigenOptimizer(qaoa)
+        result = algorithm.solve(problem)
+        L = result.x
+        i = 0
+        res = {}
+        for x in L:
+            res[i] = x
+            i += 1
+        return res
+
+
+
     def buildGain(self):
         for u,v,w in self.G.iterEdgesWeights():
             if self.solution[u] == self.solution[v]:
@@ -356,12 +390,14 @@ class Refinement:
         self.obj = self.calc_obj(self.G, self.solution)
         return
 
-
     def refine(self):
         while len(self.gainlist) > 0:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
-            S = self.mqlibSolve(G=subprob[0])
+            if self.solver == 'qaoa':
+                S =self.qaoa(p=3)
+            else:
+                S = self.mqlibSolve(G=subprob[0])
             new_sol = self.solution.copy()
             
             keys = mapProbToSubProb.keys()
@@ -387,8 +423,6 @@ class Refinement:
                 self.updateGain(new_sol)
                 self.solution = new_sol.copy()
 
-
-
     def refineLevel(self):
         ct = 0
         obj = 0
@@ -396,7 +430,7 @@ class Refinement:
             self.refine()
             self.locked_nodes = set()
             self.buildGain()
-        self.fixSolution()
+            self.fixSolution()
 
 
 class MaxcutSolver:
