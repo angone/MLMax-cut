@@ -17,7 +17,9 @@ def pyomo(G, time):
         w = G.weight(u,v)
         model.obj.expr += (2 * w * model.x[u] * model.x[v])
         model.obj.expr += (-w * model.x[u]) + (-w * model.x[v])
+    print('solving')
     results = opt.solve(model)
+    print('solved')
     print(results)
     solution = {}
     for i in range(G.numberOfNodes()):
