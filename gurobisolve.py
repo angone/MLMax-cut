@@ -4,7 +4,7 @@ import sys
 
 def pyomo(G, time):
 
-    opt = pyo.SolverFactory('gurobi_direct')
+    opt = pyo.SolverFactory('gurobi')
     opt.options['TimeLimit'] = time
 
     model = pyo.ConcreteModel()
