@@ -30,6 +30,9 @@ def pyomo(G, time):
             solution[i] = 1
     return solution
 
-print(sys.argv)
+
+
 G = nw.readGraph("./graphs/"+sys.argv[1], nw.Format.EdgeListSpaceOne)
-pyomo(G, int(sys.argv[2]))
+time = int(sys.argv[2])
+print(G,time)
+pyomo(G, time)
