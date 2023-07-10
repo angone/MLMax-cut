@@ -32,4 +32,4 @@ def pyomo(G, time):
 
 print(sys.argv)
 G = nw.readGraph("./graphs/"+sys.argv[1], nw.Format.EdgeListSpaceOne)
-pyomo(G, sys.argv[2])
+pyomo(G, int(sys.argv[2]))
