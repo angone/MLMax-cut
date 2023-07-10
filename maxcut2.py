@@ -515,7 +515,7 @@ def get_max_memory_usage():
     max_memory_mb = max_memory / 1024
     return max_memory_mb
 s = time.perf_counter()
-M = MaxcutSolver(fname=args.g, spsize=args.sp, solver=args.S)
+M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S)
 M.solve()
 t = time.perf_counter()
 print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
