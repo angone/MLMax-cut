@@ -12,7 +12,7 @@ def pyomo(G, time):
     model.x = pyo.Var(pyo.RangeSet(0,model.n-1), within=pyo.Binary)
     model.obj = pyo.Objective(expr = 0)
     model.c = pyo.Constraint(rule=model.x[2]<=1)
-
+    
     for u,v in G.iterEdges():
         w = G.weight(u,v)
         model.obj.expr += (2 * w * model.x[u] * model.x[v])
