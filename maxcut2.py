@@ -392,7 +392,7 @@ class Refinement:
         return
 
     def refine(self):
-        while len(self.gainlist) > 0:
+        while len(self.gainlist) > 0 and self.gainlist[0]:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
@@ -423,6 +423,7 @@ class Refinement:
                 self.obj = new_obj
                 self.updateGain(new_sol)
                 self.solution = new_sol.copy()
+            print(self.gainlist)
 
     def refineLevel(self):
         ct = 0
