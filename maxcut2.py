@@ -481,7 +481,7 @@ class MaxcutSolver:
             for i in range(len(S)):
                 S[i] = self.solution[fineToCoarse[i]]
             self.solution = S
-            if self.solver == 'mqlib':
+            if self.solver == 'qaoa':
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 #R.test()
