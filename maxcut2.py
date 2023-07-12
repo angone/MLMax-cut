@@ -316,7 +316,6 @@ class Refinement:
                         c += 1
         else:
             self.passes += 1
-            print('passdone')
             self.randomness += self.increase
             spsize = self.spsize
             spnodes = self.gainlist[:len(self.gainlist)]
@@ -433,6 +432,7 @@ class Refinement:
             self.locked_nodes = set()
             self.buildGain()
             self.fixSolution()
+            print('pass done')
 
 
 class MaxcutSolver:
