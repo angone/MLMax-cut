@@ -431,8 +431,6 @@ class Refinement:
             self.locked_nodes = set()
             self.fixSolution()
             self.buildGain()
-            print('pass done')
-            print(self.gainlist[0])
             
 
 
