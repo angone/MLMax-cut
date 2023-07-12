@@ -429,9 +429,11 @@ class Refinement:
         while self.passes < self.bound:
             self.refine()
             self.locked_nodes = set()
-            self.buildGain()
             self.fixSolution()
+            self.buildGain()
             print('pass done')
+            print(self.gainlist[0])
+            
 
 
 class MaxcutSolver:
