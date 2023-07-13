@@ -427,10 +427,11 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
-            print(self.obj)
+            print('after refine:',self.obj)
             self.locked_nodes = set()
             self.fixSolution()
-            print(self.obj)
+            print('after fix':self.obj)
+            print('pass',self.passes,'complete')
             self.buildGain()
             
 
