@@ -371,22 +371,22 @@ class Refinement:
         return (subprob, mapProbToSubProb, idx)
 
     def fixSolution(self):
-        done = False
-        while not done:
-            done =  True
-            for i in range(self.n):
-                if self.gainmap[i] > 0:
-                    done = False
-                    self.solution[i] = 1 - self.solution[i]
-                    self.gainmap[i] = 0
-                    for v in self.G.iterNeighbors(i):
-                        w = self.G.weight(v, i)
-                        if self.solution[v] == self.solution[i]:
-                            self.gainmap[i] += w
-                            self.gainmap[v] += 2*w
-                        else:
-                            self.gainmap[i] -= w
-                            self.gainmap[v] -= 2*w
+        #done = False
+        #while not done:
+        #    done =  True
+        for i in range(self.n):
+            if self.gainmap[i] > 0:
+        #        done = False
+                self.solution[i] = 1 - self.solution[i]
+                self.gainmap[i] = 0
+                for v in self.G.iterNeighbors(i):
+                    w = self.G.weight(v, i)
+                    if self.solution[v] == self.solution[i]:
+                        self.gainmap[i] += w
+                        self.gainmap[v] += 2*w
+                    else:
+                        self.gainmap[i] -= w
+                        self.gainmap[v] -= 2*w
         self.obj = self.calc_obj(self.G, self.solution)
         return
 
