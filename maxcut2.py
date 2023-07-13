@@ -421,14 +421,16 @@ class Refinement:
                 self.obj = new_obj
                 self.updateGain(new_sol)
                 self.solution = new_sol.copy()
-            print(self.obj)
+            
     def refineLevel(self):
         ct = 0
         obj = 0
         while self.passes < self.bound:
             self.refine()
+            print(self.obj)
             self.locked_nodes = set()
             self.fixSolution()
+            print(self.obj)
             self.buildGain()
             
 
