@@ -189,17 +189,12 @@ class Refinement:
         self.randomness = 1
         self.bound = 3
         self.increase = -1
+        self.done = False
         
     def refine_coarse(self):
         self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
-    
-    def terminate(self):
-        for i in range(self.n):
-            if self.gainmap[i] > 0 or self.uses[i] < 2:
-                return False
-        return True
 
     def calc_obj(self, G, solution):
         obj = 0
@@ -255,8 +250,6 @@ class Refinement:
             i += 1
         return res
 
-
-
     def buildGain(self):
         for u,v,w in self.G.iterEdgesWeights():
             if self.solution[u] == self.solution[v]:
@@ -281,8 +274,6 @@ class Refinement:
         for u in changed:
             for v in self.G.iterNeighbors(u):
                 if v not in self.locked_nodes:
-                    if v not in to_update:
-                        to_update.add(v)
                     if v in self.gainlist:
                         self.gainlist.remove(v)
                     w = 2*self.G.weight(u,v)*(1+self.alpha)
@@ -316,6 +307,7 @@ class Refinement:
                         c += 1
         else:
             self.passes += 1
+            self.done = True
             self.randomness += self.increase
             spsize = self.spsize
             spnodes = self.gainlist[:len(self.gainlist)]
@@ -391,7 +383,7 @@ class Refinement:
         return
 
     def refine(self):
-        while len(self.gainlist) > 0 :
+        while not self.done:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
@@ -427,11 +419,8 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
-            print('after refine:',self.obj)
+            print('pass:',self.passes,'after refine:',self.obj)
             self.locked_nodes = set()
-            #self.fixSolution()
-            #print('after fix:',self.obj)
-            #print('pass',self.passes,'complete')
             self.buildGain()
             
 
@@ -480,15 +469,15 @@ class MaxcutSolver:
             fineToCoarse = E.mapFineToCoarse
             print('Level',i+1,'Nodes:',G.numberOfNodes(),'Edges:',G.numberOfEdges())
             S = [0 for _ in range(G.numberOfNodes())]
-            for i in range(len(S)):
-                S[i] = self.solution[fineToCoarse[i]]
+            for j in range(len(S)):
+                S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
             if self.solver == 'mqlib':
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
-                #R.test()
                 self.solution = R.solution
                 self.obj = R.obj
+                print(self.obj)
             else:
                 if False:
                     inputs = [(E.G, self.noisySolution(0.50), j) for j in range(starts)]
@@ -509,7 +498,7 @@ class MaxcutSolver:
                 self.obj = max_obj
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
-            starts = max(2, int(starts/2))
+                starts = max(2, int(starts/2))
         print('Mqlib:',R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph)), 'in',sptime,'s')
 
 def get_max_memory_usage():
