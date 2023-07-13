@@ -429,9 +429,9 @@ class Refinement:
             self.refine()
             print('after refine:',self.obj)
             self.locked_nodes = set()
-            self.fixSolution()
-            print('after fix:',self.obj)
-            print('pass',self.passes,'complete')
+            #self.fixSolution()
+            #print('after fix:',self.obj)
+            #print('pass',self.passes,'complete')
             self.buildGain()
             
 
