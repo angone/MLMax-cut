@@ -306,7 +306,6 @@ class Refinement:
                         used.add(k)
                         c += 1
         else:
-            self.passes += 1
             self.done = True
             self.randomness += self.increase
             spsize = self.spsize
@@ -419,6 +418,8 @@ class Refinement:
         obj = 0
         while self.passes < self.bound:
             self.refine()
+            self.done = False
+            self.passes += 1
             print('pass:',self.passes,'after refine:',self.obj)
             self.locked_nodes = set()
             self.buildGain()
