@@ -420,7 +420,6 @@ class Refinement:
             self.refine()
             self.done = False
             self.passes += 1
-            print('pass:',self.passes,'after refine:',self.obj)
             self.locked_nodes = set()
             self.buildGain()
             
@@ -473,7 +472,7 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
-            if self.solver == 'mqlib':
+            if self.solver == 'qaoa':
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
                 R.refineLevel()
                 self.solution = R.solution
@@ -500,6 +499,7 @@ class MaxcutSolver:
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
+        print('refinement time:',sptime)
         print('Mqlib:',R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph)), 'in',sptime,'s')
 
 def get_max_memory_usage():
