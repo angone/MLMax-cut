@@ -107,6 +107,7 @@ class EmbeddingCoarsening:
                         used.add(u)
                         used.add(v)
                         flag = True
+                    ct += 1
                     if ct >= 10 and flag == False:
                         while flag == False:
                             j = (j+1) % n
