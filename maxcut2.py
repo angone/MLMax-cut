@@ -87,10 +87,10 @@ class EmbeddingCoarsening:
     def randomCoarsen(self):
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
+        random.shuffle(nodes)
         if n % 2 == 1:
             self.R = nodes[n-1]
             n = n-1
-        random.shuffle(nodes)
         used = set()
         for i in range(n):
 
