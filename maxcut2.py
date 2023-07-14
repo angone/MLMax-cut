@@ -152,6 +152,7 @@ class EmbeddingCoarsening:
         indices = []
         newspace = []
         k = len(singletons)
+        print(k, 'singletons')
         if k % 2 == 1:
             k = k-1
             self.R = singletons[k]
@@ -193,10 +194,10 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        #for _ in range(self.d):
-        #    self.embed()
-        #self.match()
-        self.randomCoarsen()
+        for _ in range(self.d):
+            self.embed()
+        self.match()
+        #self.randomCoarsen()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
             self.mapFineToCoarse[u] = idx
