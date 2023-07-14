@@ -90,19 +90,20 @@ class EmbeddingCoarsening:
         random.shuffle(nodes)
         used = set()
         for i in range(n):
-            ct = 0
+
             u = nodes[i]
             if u not in used:
                 flag = False
+                ct = 0
                 while not flag:
                     j = random.randint(i+1,n-1)
                     v = nodes[j]
-                    if v not in used and not self.G.hasEdge(u,v) and ct < 4:
+                    if v not in used and not self.G.hasEdge(u,v) and ct < 10:
                         self.M.add((u,v))
                         used.add(u)
                         used.add(v)
                         flag = True
-                    if ct >= 4 and flag == False:
+                    if ct >= 10 and flag == False:
                         j = (j+1) % n
                         v = nodes[j]
                         if v not in used:
