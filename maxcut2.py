@@ -72,7 +72,7 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        nodes = [i for i in range(n)]
+        nodes = [i for i in self.G.iterNodes()]
         random.shuffle(nodes)
         for i in nodes:
             b = self.buildObj(i)
@@ -195,10 +195,10 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        #for _ in range(self.d):
-        #    self.embed()
-        #self.match()
-        self.randomCoarsen()
+        for _ in range(30):
+            self.embed()
+        self.match()
+        #self.randomCoarsen()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
             self.mapFineToCoarse[u] = idx
@@ -472,10 +472,10 @@ class Refinement:
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
-        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
-        print('total:',self.problem_graph.numberOfNodes())
-        self.problem_graph = nw.components.ConnectedComponents.extractLargestConnectedComponent(self.problem_graph)
-        print('largest component:',self.problem_graph.numberOfNodes())
+        nxG = nx.read_gml("./Untitled.gml")
+        self.problem_graph = nw.nxadapter.nx2nk(nxG)
+#	self.problem_graph = nw.readGraph("./Untitled.gml", nw.Format.GML)
+        print(self.problem_graph)
         self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
