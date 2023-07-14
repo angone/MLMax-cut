@@ -90,7 +90,7 @@ class EmbeddingCoarsening:
         random.shuffle(nodes)
         if n % 2 == 1:
             self.R = nodes[n-1]
-            n = n-1
+            used.add(self.R)
         used = set()
         for i in range(n):
 
