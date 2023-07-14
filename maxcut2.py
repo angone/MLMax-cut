@@ -487,13 +487,13 @@ class MaxcutSolver:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 max_obj = self.obj
                 max_sol = self.solution
-                for _ in range(3):
+                for I in range(3):
                     pool = multiprocessing.Pool()
-                    sptime -= time.perf_counter()
+                    if I == 0:
+                        sptime -= time.perf_counter()
                     outputs = pool.map(parallel, inputs)
-                    sptime += time.perf_counter()
-                    #print([outputs[i][1] for i in range(len(outputs))])
-                    
+                    if I == 0:
+                        sptime += time.perf_counter()
                     for O in outputs:
                         if O[1] > max_obj:
                             max_obj = O[1]
