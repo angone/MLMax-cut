@@ -485,17 +485,19 @@ class MaxcutSolver:
                     inputs = [(E.G, self.noisySolution(0.50), j) for j in range(starts)]
                 else:
                     inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
-                pool = multiprocessing.Pool()
-                sptime -= time.perf_counter()
-                outputs = pool.map(parallel, inputs)
-                sptime += time.perf_counter()
-                #print([outputs[i][1] for i in range(len(outputs))])
-                max_obj = outputs[0][1]
-                max_sol = outputs[0][0]
-                for O in outputs:
-                    if O[1] > max_obj:
-                        max_obj = O[1]
-                        max_sol = O[0]
+                max_obj = self.obj
+                max_sol = self.solution
+                for _ in range(3):
+                    pool = multiprocessing.Pool()
+                    sptime -= time.perf_counter()
+                    outputs = pool.map(parallel, inputs)
+                    sptime += time.perf_counter()
+                    #print([outputs[i][1] for i in range(len(outputs))])
+                    
+                    for O in outputs:
+                        if O[1] > max_obj:
+                            max_obj = O[1]
+                            max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
