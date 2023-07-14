@@ -174,11 +174,12 @@ class EmbeddingCoarsening:
             if idx not in used:
                 for j in ind[i]:
                     jdx = indices[j]
-                    if jdx not in used and idx != jdx and (ct >=4 or not self.G.hasEdge(idx, jdx)):
+                    if jdx not in used and idx != jdx and (ct >=10 or not self.G.hasEdge(idx, jdx)):
                         self.M.add((idx, jdx))
                         used.add(idx)
                         used.add(jdx)
                         break
+                    ct += 1
         for i in range(n):
             if i not in used:
                 unused.append(i)
