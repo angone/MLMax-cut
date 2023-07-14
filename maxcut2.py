@@ -428,7 +428,9 @@ class Refinement:
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
+        print('total:',self.problem_graph.numberOfNodes())
         self.problem_graph = nw.components.ConnectedComponents.extractLargestConnectedComponent(self.problem_graph)
+        print('largest component:',self.problem_graph.numberOfNodes())
         self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
