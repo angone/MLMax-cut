@@ -22,8 +22,9 @@ from qiskit.algorithms import QAOA
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 
 T = 0
-random.seed(0)
-np.random.seed(0)
+
+random.seed(int(time.perf_counter()))
+np.random.seed(int(time.perf_counter()))
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -37,7 +38,7 @@ args = parser.parse_args()
 sptime = 0
 def parallel(ref):
 
-    s = int(ref[2])
+    s = int(time.perf_counter()*ref[2])
     random.seed(s)
     np.random.seed(s)
     R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
@@ -71,7 +72,9 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
-        for i in range(n):
+        nodes = [i for i in range(n)]
+        random.shuffle(nodes)
+        for i in nodes:
             b = self.buildObj(i)
             bnds = [(-1,1) for _ in range(self.d)]
             p = [self.space[i][j] for j in range(self.d)]
@@ -502,6 +505,7 @@ class MaxcutSolver:
                 self.obj = max_obj
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
+                print(R.calc_obj(E.G, R.mqlibSolve(t=5, G=E.G)))
                 starts = max(2, int(starts/2))
         print('refinement time:',sptime)
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
