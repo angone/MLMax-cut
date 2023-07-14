@@ -104,13 +104,14 @@ class EmbeddingCoarsening:
                         used.add(v)
                         flag = True
                     if ct >= 10 and flag == False:
-                        j = (j+1) % n
-                        v = nodes[j]
-                        if v not in used:
-                            self.M.add((u,v))
-                            used.add(u)
-                            used.add(v)
-                            flag = True
+                        while flag == False:
+                            j = (j+1) % n
+                            v = nodes[j]
+                            if v not in used:
+                                self.M.add((u,v))
+                                used.add(u)
+                                used.add(v)
+                                flag = True
 
                 
 
