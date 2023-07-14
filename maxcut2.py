@@ -144,7 +144,7 @@ class EmbeddingCoarsening:
             if i not in used:
                 unused.append(i)
         m = len(unused)
-        
+        print('bad:',m)
         for i in range(int(m/2)):
             self.M.add((unused[2*i], unused[2*i + 1]))
 
