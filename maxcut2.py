@@ -88,10 +88,11 @@ class EmbeddingCoarsening:
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
         random.shuffle(nodes)
+        used = set()
         if n % 2 == 1:
             self.R = nodes[n-1]
             used.add(self.R)
-        used = set()
+
         for i in range(n):
 
             u = nodes[i]
