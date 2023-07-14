@@ -84,6 +84,37 @@ class EmbeddingCoarsening:
             res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
             self.space[i] = res.x 
     
+    def randomCoarsen(self):
+        n = self.G.numberOfNodes()
+        nodes = [i for i in range(n)]
+        random.shuffle(nodes)
+        used = set()
+        for i in range(n):
+            ct = 0
+            u = nodes[i]
+            if u not in used:
+                flag = False
+                while not flag:
+                    j = random.randint(i+1,n-1)
+                    v = nodes[j]
+                    if v not in used and not self.G.hasEdge(u,v) and ct < 4:
+                        self.M.add((u,v))
+                        used.add(u)
+                        used.add(v)
+                        flag = True
+                    if ct >= 4 and flag == False:
+                        j = (j+1) % n
+                        v = nodes[j]
+                        if v not in used:
+                            self.M.add((u,v))
+                            used.add(u)
+                            used.add(v)
+                            flag = True
+
+                
+
+
+
     def match(self):
         n = self.G.numberOfNodes()
         tree = KDTree(self.space)
@@ -155,9 +186,10 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        for _ in range(self.d):
-            self.embed()
-        self.match()
+        #for _ in range(self.d):
+        #    self.embed()
+        #self.match()
+        self.randomCoarsen()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
             self.mapFineToCoarse[u] = idx
