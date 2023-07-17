@@ -68,7 +68,18 @@ class EmbeddingCoarsening:
         return obj
     
 
-    
+    def optimalPos(self, u):
+        p = [0 for _ in range(self.d)]
+        for v in self.G.iterNeighbors(u):
+            for i in range(self.d):
+                p[i] += self.space[v][i]
+        for i in range(self.d):
+            p[i] = p[i] / self.G.degree(u)
+        return p
+        
+
+
+
     def embed(self):
         n = self.G.numberOfNodes()
         embeddings = []
@@ -83,6 +94,8 @@ class EmbeddingCoarsening:
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
             res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
             self.space[i] = res.x 
+    
+
     
     def randomCoarsen(self):
         n = self.G.numberOfNodes()
@@ -472,10 +485,7 @@ class Refinement:
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
-        nxG = nx.read_gml("./Untitled.gml")
-        self.problem_graph = nw.nxadapter.nx2nk(nxG)
-#	self.problem_graph = nw.readGraph("./Untitled.gml", nw.Format.GML)
-        print(self.problem_graph)
+        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
         self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
@@ -495,13 +505,15 @@ class MaxcutSolver:
         global sptime
         G = self.problem_graph
         print(G)
-
+        s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'sphere')
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
             G = E.cG
+        t = time.perf_counter()
+        print('Coarsening Time:', (t-s))
 
 
         self.hierarchy.reverse()
