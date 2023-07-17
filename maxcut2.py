@@ -77,8 +77,15 @@ class EmbeddingCoarsening:
             p[i] = p[i] / self.G.degree(u)
         return p
         
+    def coarseObj(self):
+        o = 0
+        for u, v, w in self.G.iterEdgesWeights():
+            for i in range(self.d):
+                o += w * (self.space[u][i] - self.space[v][i])**2
+        print('Current Obj (to be minimized):',o)
 
-
+    def embed2(self):
+        S = [[0 for _ in range(self.d)] for _ in range(self.G.numberOfNodes())]
 
     def embed(self):
         n = self.G.numberOfNodes()
@@ -94,9 +101,9 @@ class EmbeddingCoarsening:
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
             res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
             self.space[i] = res.x 
+        self.coarseObj()
     
 
-    
     def randomCoarsen(self):
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
@@ -132,9 +139,6 @@ class EmbeddingCoarsening:
                                 flag = True
 
                 
-
-
-
     def match(self):
         n = self.G.numberOfNodes()
         tree = KDTree(self.space)
@@ -165,7 +169,6 @@ class EmbeddingCoarsening:
         indices = []
         newspace = []
         k = len(singletons)
-        print(k, 'singletons')
         if k % 2 == 1:
             k = k-1
             self.R = singletons[k]
@@ -197,7 +200,6 @@ class EmbeddingCoarsening:
             if i not in used:
                 unused.append(i)
         m = len(unused)
-        print('bad:',m)
         for i in range(int(m/2)):
             self.M.add((unused[2*i], unused[2*i + 1]))
 
@@ -514,7 +516,7 @@ class MaxcutSolver:
             G = E.cG
         t = time.perf_counter()
         print('Coarsening Time:', (t-s))
-
+        exit()
 
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
