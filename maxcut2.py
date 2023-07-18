@@ -210,7 +210,7 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        for _ in range(30):
+        for _ in range(3):
             self.embed()
         self.match()
         #self.randomCoarsen()
