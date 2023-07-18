@@ -70,7 +70,6 @@ class EmbeddingCoarsening:
 
     def nodeObj(self, p, c):
         obj = 0
-        print(c)
         for x in c:
             for i in range(self.d):
                 obj += x[self.d]*(p[i]-x[i])**2
@@ -80,7 +79,6 @@ class EmbeddingCoarsening:
         coefficients = []
         critical_point = [0 for _ in range(self.d)]
         d_u = self.G.degree(u)
-        print('degree:', d_u)
         for v in self.G.iterNeighbors(u):
             temp = []
             for i in range(self.d):
