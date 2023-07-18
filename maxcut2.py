@@ -525,7 +525,7 @@ class MaxcutSolver:
         profile.disable()
         with open('benchmark.out', 'w') as f:
             stats = pstats.Stats(profile, stream=f)
-            stats.sort_stats(pstats.SortKey.TIME)  # Adjust the sort order if needed
+            stats.sort_stats('tottime')  # Adjust the sort order if needed
             stats.print_stats()
         exit()
 
