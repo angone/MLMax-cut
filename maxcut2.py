@@ -56,7 +56,6 @@ class EmbeddingCoarsening:
         self.M = set()
         self.R = -1
 
-
     def buildObj(self, u):
         def obj(pos):
             o = 0
@@ -100,7 +99,7 @@ class EmbeddingCoarsening:
             def sphere(x):
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
-            res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
+            res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons, method='L-BFGS-B')
             if flag:
                 print(res)
                 flag = False
@@ -141,8 +140,7 @@ class EmbeddingCoarsening:
                                 used.add(u)
                                 used.add(v)
                                 flag = True
-
-                
+         
     def match(self):
         n = self.G.numberOfNodes()
         tree = KDTree(self.space)
