@@ -70,6 +70,7 @@ class EmbeddingCoarsening:
 
     def nodeObj(self, p, c):
         obj = 0
+        print(c)
         for x in c:
             for i in range(self.d):
                 obj += c[self.d]*(p[i]-c[x][i])**2
