@@ -68,14 +68,38 @@ class EmbeddingCoarsening:
         return obj
     
 
-    def optimalPos(self, u):
-        p = [0 for _ in range(self.d)]
-        for v in self.G.iterNeighbors(u):
+    def nodeObj(self, p, c):
+        obj = 0
+        for x in c:
             for i in range(self.d):
-                p[i] += self.space[v][i]
+                obj += c[self.d]*(p[i]-c[x][i])**2
+        return obj
+
+    def optimalPos(self, u):
+        coefficients = []
+        critical_point = [0 for _ in range(self.d)]
+        d_u = self.G.degree(u)
+        for v in self.G.iterNeighbors(u):
+            temp = []
+            for _ in range(self.d):
+                t = self.space[v][i]
+                temp.append(t)
+                critical_point[i] += t
+            temp.append(self.G.weight(u, v))
+            coefficients.append(temp)
         for i in range(self.d):
-            p[i] = p[i] / self.G.degree(u)
-        return p
+            critical_point[i] = critical_point[i] / d_u
+
+        points = [[0,0,0],[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0],[1,1,1],critical_point]
+        max_obj = 0
+        best_point = None
+        for p in points:
+            o = self.nodeObj(p, coefficients)
+            if o > max_obj:
+                max_obj = o
+                best_point = p
+        return best_point, max_obj
+
         
     def coarseObj(self):
         o = 0
@@ -85,7 +109,13 @@ class EmbeddingCoarsening:
         print('Current Obj (to be minimized):',o)
 
     def embed2(self):
-        S = [[0 for _ in range(self.d)] for _ in range(self.G.numberOfNodes())]
+        n = self.G.numberOfNodes()
+        nodes = [i for i in range(n)]
+        random.shuffle(nodes)
+        for i in nodes:
+            res = self.optimalPos(i)
+            self.space[i] = res[0]
+        self.coarseObj()
 
     def embed(self):
         n = self.G.numberOfNodes()
@@ -213,7 +243,7 @@ class EmbeddingCoarsening:
         self.mapFineToCoarse = {}
         idx = 0
         for _ in range(3):
-            self.embed()
+            self.embed2()
         self.match()
         #self.randomCoarsen()
         for u, v in self.M:
