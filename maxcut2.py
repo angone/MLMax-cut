@@ -20,7 +20,7 @@ from qiskit.algorithms.optimizers import COBYLA
 from qiskit import BasicAer
 from qiskit.algorithms import QAOA
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
-
+import pstats
 T = 0
 
 random.seed(int(time.perf_counter()))
@@ -507,6 +507,8 @@ class MaxcutSolver:
         global sptime
         G = self.problem_graph
         print(G)
+        profile = cProfile.Profile()
+        profile.enable()
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'sphere')
@@ -516,6 +518,11 @@ class MaxcutSolver:
             G = E.cG
         t = time.perf_counter()
         print('Coarsening Time:', (t-s))
+        profile.disable()
+        with open('benchmark.out', 'w') as f:
+            stats = pstats.Stats(profile, stream=f)
+            stats.sort_stats(pstats.SortKey.CUMULATIVE)  # Adjust the sort order if needed
+            stats.print_stats()
         exit()
 
         self.hierarchy.reverse()
