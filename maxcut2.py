@@ -36,6 +36,7 @@ parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embeddi
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 sptime = 0
+flag = True
 def parallel(ref):
 
     s = int(time.perf_counter()*ref[2])
@@ -100,6 +101,9 @@ class EmbeddingCoarsening:
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
             res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
+            if not flag:
+                print(res)
+                flag = True
             self.space[i] = res.x 
         self.coarseObj()
     
@@ -521,7 +525,7 @@ class MaxcutSolver:
         profile.disable()
         with open('benchmark.out', 'w') as f:
             stats = pstats.Stats(profile, stream=f)
-            stats.sort_stats(pstats.SortKey.CUMULATIVE)  # Adjust the sort order if needed
+            stats.sort_stats(pstats.SortKey.TIME)  # Adjust the sort order if needed
             stats.print_stats()
         exit()
 
