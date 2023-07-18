@@ -73,7 +73,7 @@ class EmbeddingCoarsening:
         print(c)
         for x in c:
             for i in range(self.d):
-                obj += c[self.d]*(p[i]-c[x][i])**2
+                obj += c[x][self.d]*(p[i]-c[x][i])**2
         return obj
 
     def optimalPos(self, u):
