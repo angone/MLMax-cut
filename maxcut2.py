@@ -56,18 +56,6 @@ class EmbeddingCoarsening:
         self.M = set()
         self.R = -1
 
-    def buildObj(self, u):
-        def obj(pos):
-            o = 0
-            for x in self.G.iterNeighbors(u):
-                temp = 0
-                for i in range(self.d):
-                    temp += (pos[i] - self.space[x][i])**2
-                o += ((temp)*self.G.weight(u,x))
-            return -1 * o
-        return obj
-    
-
     def nodeObj(self, p, c):
         obj = 0
         for x in c:
@@ -100,7 +88,6 @@ class EmbeddingCoarsening:
                 best_point = p
         return best_point, max_obj
 
-        
     def coarseObj(self):
         o = 0
         for u, v, w in self.G.iterEdgesWeights():
@@ -108,7 +95,7 @@ class EmbeddingCoarsening:
                 o += w * (self.space[u][i] - self.space[v][i])**2
         print('Current Obj (to be minimized):',o)
 
-    def embed2(self):
+    def embed(self):
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
         random.shuffle(nodes)
@@ -116,61 +103,7 @@ class EmbeddingCoarsening:
             res = self.optimalPos(i)
             self.space[i] = res[0]
         self.coarseObj()
-
-    def embed(self):
-        n = self.G.numberOfNodes()
-        embeddings = []
-        nodes = [i for i in self.G.iterNodes()]
-        random.shuffle(nodes)
-        for i in nodes:
-            b = self.buildObj(i)
-            bnds = [(-1,1) for _ in range(self.d)]
-            p = [self.space[i][j] for j in range(self.d)]
-            def sphere(x):
-                return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
-            cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
-            res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons, method='L-BFGS-B')
-            if flag:
-                print(res)
-                flag = False
-            self.space[i] = res.x 
-        self.coarseObj()
     
-
-    def randomCoarsen(self):
-        n = self.G.numberOfNodes()
-        nodes = [i for i in range(n)]
-        random.shuffle(nodes)
-        used = set()
-        if n % 2 == 1:
-            self.R = nodes[n-1]
-            used.add(self.R)
-
-        for i in range(n):
-
-            u = nodes[i]
-            if u not in used:
-                flag = False
-                ct = 0
-                while not flag:
-                    j = random.randint(i+1,n-1)
-                    v = nodes[j]
-                    if v not in used and not self.G.hasEdge(u,v) and ct < 10:
-                        self.M.add((u,v))
-                        used.add(u)
-                        used.add(v)
-                        flag = True
-                    ct += 1
-                    if ct >= 10 and flag == False:
-                        while flag == False:
-                            j = (j+1) % n
-                            v = nodes[j]
-                            if v not in used:
-                                self.M.add((u,v))
-                                used.add(u)
-                                used.add(v)
-                                flag = True
-         
     def match(self):
         n = self.G.numberOfNodes()
         tree = KDTree(self.space)
@@ -242,10 +175,9 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        for _ in range(3):
-            self.embed2()
+        for _ in range(30):
+            self.embed()
         self.match()
-        #self.randomCoarsen()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
             self.mapFineToCoarse[u] = idx
