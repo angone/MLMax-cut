@@ -102,7 +102,6 @@ class EmbeddingCoarsening:
         for i in nodes:
             res = self.optimalPos(i)
             self.space[i] = res[0]
-        self.coarseObj()
     
     def match(self):
         n = self.G.numberOfNodes()
