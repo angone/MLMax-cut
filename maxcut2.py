@@ -73,13 +73,14 @@ class EmbeddingCoarsening:
         print(c)
         for x in c:
             for i in range(self.d):
-                obj += c[x][self.d]*(p[i]-c[x][i])**2
+                obj += x[self.d]*(p[i]-x[i])**2
         return obj
 
     def optimalPos(self, u):
         coefficients = []
         critical_point = [0 for _ in range(self.d)]
         d_u = self.G.degree(u)
+        print('degree:', d_u)
         for v in self.G.iterNeighbors(u):
             temp = []
             for i in range(self.d):
