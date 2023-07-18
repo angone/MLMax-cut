@@ -101,9 +101,9 @@ class EmbeddingCoarsening:
                 return np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) - 1
             cons = [{'type': 'ineq', 'fun': sphere}] if self.shape == 'sphere' else None
             res = minimize(b, p, bounds=bnds, tol=0.01, constraints=cons)
-            if not flag:
+            if flag:
                 print(res)
-                flag = True
+                flag = False
             self.space[i] = res.x 
         self.coarseObj()
     
