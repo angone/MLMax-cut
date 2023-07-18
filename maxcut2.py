@@ -81,7 +81,7 @@ class EmbeddingCoarsening:
         d_u = self.G.degree(u)
         for v in self.G.iterNeighbors(u):
             temp = []
-            for _ in range(self.d):
+            for i in range(self.d):
                 t = self.space[v][i]
                 temp.append(t)
                 critical_point[i] += t
