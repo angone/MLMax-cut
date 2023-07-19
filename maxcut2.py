@@ -470,8 +470,6 @@ class MaxcutSolver:
         global sptime
         G = self.problem_graph
         print(G)
-        profile = cProfile.Profile()
-        profile.enable()
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
             E = EmbeddingCoarsening(G, 3,'sphere')
@@ -481,12 +479,6 @@ class MaxcutSolver:
             G = E.cG
         t = time.perf_counter()
         print('Coarsening Time:', (t-s))
-        profile.disable()
-        with open('benchmark.out', 'w') as f:
-            stats = pstats.Stats(profile, stream=f)
-            stats.sort_stats('tottime')  # Adjust the sort order if needed
-            stats.print_stats()
-        exit()
 
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
