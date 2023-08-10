@@ -134,7 +134,7 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
-        random.shuffle(nodes)
+        #random.shuffle(nodes)
         change = 0
         for i in nodes:
             res, c = self.optimal(i)
