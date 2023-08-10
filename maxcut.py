@@ -564,18 +564,14 @@ class MaxcutSolver:
                             max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
-                R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
+                
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
         print('mqlib ratio:',self.obj / mqobj)
         print('coarse ratio:', self.coarse_obj/self.obj)
 
-def get_max_memory_usage():
-    max_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # Convert from kilobytes to megabytes
-    max_memory_mb = max_memory / 1024
-    return max_memory_mb
+
 s = time.perf_counter()
 M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S)
 M.solve()
@@ -583,6 +579,3 @@ t = time.perf_counter()
 print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
 
 
-
-max_memory_usage = get_max_memory_usage()
-print(f"Maximum memory usage: {max_memory_usage} MB")
