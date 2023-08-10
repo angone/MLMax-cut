@@ -38,8 +38,8 @@ parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
 args = parser.parse_args()
 sptime = 0
 flag = True
-def parallel(ref):
 
+def parallel(ref):
     s = int(time.perf_counter()*ref[2])
     random.seed(s)
     np.random.seed(s)
@@ -77,6 +77,7 @@ class EmbeddingCoarsening:
         a = 1
         b = -2*k
         c = k**2
+        X = self.space[u]
         temp = [0 for _ in range(self.d)]
         for v in self.G.iterNeighbors(u):
             w = self.G.weight(u, v)
@@ -110,37 +111,18 @@ class EmbeddingCoarsening:
             p1d += np.sqrt(t1)
             p2d += np.sqrt(t2)
         if p1d > p2d:
-            return p1
+            d = 0
+            for i in range(self.d):
+                d += (p1[i] - X[i])**2
+            return p1, np.sqrt(d)
         if p2d > p1d:
-            return p2
+            d = 0
+            for i in range(self.d):
+                d += (p2[i] - X[i])**2
+            return p2, np.sqrt(d)
         
 
 
-
-    def optimalPos(self, u):
-        coefficients = []
-        critical_point = [0 for _ in range(self.d)]
-        d_u = self.G.degree(u)
-        for v in self.G.iterNeighbors(u):
-            temp = []
-            for i in range(self.d):
-                t = self.space[v][i]
-                temp.append(t)
-                critical_point[i] += t
-            temp.append(self.G.weight(u, v))
-            coefficients.append(temp)
-        for i in range(self.d):
-            critical_point[i] = critical_point[i] / d_u
-
-        points = [[0,0,0],[0,0,1],[0,1,0],[0,1,1],[1,0,0],[1,0,1],[1,1,0],[1,1,1],critical_point]
-        max_obj = 0
-        best_point = None
-        for p in points:
-            o = self.nodeObj(p, coefficients)
-            if o > max_obj:
-                max_obj = o
-                best_point = p
-        return best_point, max_obj
 
     def coarseObj(self):
         o = 0
@@ -153,9 +135,12 @@ class EmbeddingCoarsening:
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
         random.shuffle(nodes)
+        change = 0
         for i in nodes:
-            res = self.optimal(i)
+            res, c = self.optimal(i)
             self.space[i] = res
+            change += c
+        print(c)
     
     def match(self):
         n = self.G.numberOfNodes()
