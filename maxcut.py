@@ -527,7 +527,7 @@ class MaxcutSolver:
     
     def solve(self):
         global sptime
-        G = self.problem_graph.copy()
+        G = nw.graphtools.toWeighted(self.problem_graph)
         print(G)
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
