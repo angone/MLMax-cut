@@ -140,7 +140,7 @@ class EmbeddingCoarsening:
             res, c = self.optimal(i)
             self.space[i] = res
             change += c
-        print(c)
+        print(c/n)
     
     def match(self):
         n = self.G.numberOfNodes()
