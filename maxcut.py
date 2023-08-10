@@ -527,7 +527,7 @@ class MaxcutSolver:
     
     def solve(self):
         global sptime
-        G = self.problem_graph
+        G = self.problem_graph.copy()
         print(G)
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
@@ -546,7 +546,10 @@ class MaxcutSolver:
         starts = 40
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
-            G = E.G
+            if i != len(self.hierarchy) -1:
+                G = E.G
+            else:
+                G = self.problem_graph
             fineToCoarse = E.mapFineToCoarse
             print('Level',i+1,'Nodes:',G.numberOfNodes(),'Edges:',G.numberOfEdges())
             S = [0 for _ in range(G.numberOfNodes())]
