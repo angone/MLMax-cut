@@ -253,7 +253,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.2
         self.randomness = 1
-        self.bound = 2
+        self.bound = 1
         self.increase = -1
         self.done = False
         
@@ -547,10 +547,7 @@ class MaxcutSolver:
                 self.obj = R.obj
                 print(self.obj)
             else:
-                if False:
-                    inputs = [(E.G, self.noisySolution(0.50), j) for j in range(starts)]
-                else:
-                    inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
+                inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 max_obj = self.obj
                 max_sol = self.solution
                 for I in range(3):
@@ -568,7 +565,7 @@ class MaxcutSolver:
                 self.obj = max_obj
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
-        print('starting mqlib')
+
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
         print('mqlib ratio:',self.obj / mqobj)
         print('coarse ratio:', self.coarse_obj/self.obj)
