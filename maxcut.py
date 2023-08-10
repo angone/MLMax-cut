@@ -140,8 +140,7 @@ class EmbeddingCoarsening:
             res, c = self.optimal(i)
             self.space[i] = res
             change += c
-        print(change/n)
-        return change
+        return change/n
     
     def match(self):
         n = self.G.numberOfNodes()
@@ -215,8 +214,11 @@ class EmbeddingCoarsening:
         self.mapFineToCoarse = {}
         idx = 0
         change = self.embed()
+        count = 1
         while change > 0.01:
             change = self.embed()
+            count += 1
+        print(count, 'iterations until embedding convergence')
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
