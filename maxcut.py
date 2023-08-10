@@ -65,7 +65,7 @@ class EmbeddingCoarsening:
             d = 0
             for i in range(self.d):
                 d += (self.space[u][i] - self.space[v][i])**2
-            d = np.sqrt(d)
+            d = w*np.sqrt(d)
             edgeDist.append((d, u, v))
         edgeDist.sort()
         for i in range(removeCount):
