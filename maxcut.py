@@ -70,7 +70,7 @@ class EmbeddingCoarsening:
         edgeDist.sort()
         for i in range(removeCount):
             u = edgeDist[i][1]
-            v = edgeDist[i][1]
+            v = edgeDist[i][2]
             self.G.removeEdge(u, v)
         
 
