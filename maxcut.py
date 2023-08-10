@@ -58,7 +58,7 @@ class EmbeddingCoarsening:
         self.R = -1
 
     def sparsify(self, ratio):
-        removeCount = int(ratio * self.n)
+        removeCount = int(ratio * self.G.numberOfEdges())
         edgeDist = []
         for u,v in self.G.iterEdges():
             w = self.G.weight(u,v)
