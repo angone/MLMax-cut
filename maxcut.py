@@ -134,7 +134,7 @@ class EmbeddingCoarsening:
     def embed(self):
         n = self.G.numberOfNodes()
         nodes = [i for i in range(n)]
-        #random.shuffle(nodes)
+        random.shuffle(nodes)
         change = 0
         for i in nodes:
             res, c = self.optimal(i)
@@ -566,7 +566,7 @@ class MaxcutSolver:
                 self.obj = max_obj
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
-                
+
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
         print('mqlib ratio:',self.obj / mqobj)
         print('coarse ratio:', self.coarse_obj/self.obj)
