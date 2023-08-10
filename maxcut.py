@@ -261,6 +261,7 @@ class Refinement:
         self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
+        return self.obj
 
     def calc_obj(self, G, solution):
         obj = 0
@@ -524,7 +525,7 @@ class MaxcutSolver:
         print(t-s, 'sec coarsening')
         self.hierarchy.reverse()
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
-        R.refine_coarse()
+        self.coarse_obj = R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
         starts = 40
@@ -566,10 +567,9 @@ class MaxcutSolver:
                 R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
-        print('refinement time:',sptime)
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
-        print('Mqlib:',mqobj, 'in',sptime,'s')
-        print(self.obj / mqobj)
+        print('mqlib ratio:',self.obj / mqobj)
+        print('coarse ratio:', self.coarse_obj/self.obj)
 
 def get_max_memory_usage():
     max_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
