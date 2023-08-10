@@ -90,7 +90,7 @@ class EmbeddingCoarsening:
         p = k - lambda1
         q = k - lambda2
         if p == 0 and q == 0:
-            return self.randPoint()
+            return X, 0
         if p != 0:
             p1 = [temp[i] / p for i in range(self.d)]
         if q != 0:
