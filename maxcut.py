@@ -57,6 +57,23 @@ class EmbeddingCoarsening:
         self.M = set()
         self.R = -1
 
+    def sparsify(self, ratio):
+        removeCount = ratio * self.n
+        edgeDist = []
+        for u,v in self.G.iterEdges():
+            w = self.G.weight(u,v)
+            d = 0
+            for i in range(self.d):
+                d += (self.space[u][i] - self.space[v][i])**2
+            d = np.sqrt(d)
+            edgeDist.append((d, u, v))
+        edgeDist.sort()
+        for i in range(removeCount):
+            u = edgeDist[i][1]
+            v = edgeDist[i][1]
+            self.G.removeEdge(u, v)
+        
+
     def nodeObj(self, p, c):
         obj = 0
         for x in c:
@@ -120,9 +137,6 @@ class EmbeddingCoarsening:
             for i in range(self.d):
                 d += (p2[i] - X[i])**2
             return p2, np.sqrt(d)
-        
-
-
 
     def coarseObj(self):
         o = 0
@@ -219,6 +233,7 @@ class EmbeddingCoarsening:
             change = self.embed()
             count += 1
         print(count, 'iterations until embedding convergence')
+        self.sparsify(0.1)
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
