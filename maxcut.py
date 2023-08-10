@@ -253,7 +253,7 @@ class Refinement:
         self.locked_nodes = set()
         self.alpha = 0.2
         self.randomness = 1
-        self.bound = 1
+        self.bound = 2
         self.increase = -1
         self.done = False
         
@@ -550,17 +550,15 @@ class MaxcutSolver:
                 inputs = [(E.G, self.solution.copy(), j) for j in range(starts)]
                 max_obj = self.obj
                 max_sol = self.solution
-                for I in range(3):
-                    pool = multiprocessing.Pool()
-                    if I == 0:
-                        sptime -= time.perf_counter()
-                    outputs = pool.map(parallel, inputs)
-                    if I == 0:
-                        sptime += time.perf_counter()
-                    for O in outputs:
-                        if O[1] > max_obj:
-                            max_obj = O[1]
-                            max_sol = O[0]
+
+                pool = multiprocessing.Pool()
+                sptime -= time.perf_counter()
+                outputs = pool.map(parallel, inputs)
+                sptime += time.perf_counter()
+                for O in outputs:
+                    if O[1] > max_obj:
+                        max_obj = O[1]
+                        max_sol = O[0]
                 self.solution = max_sol
                 self.obj = max_obj
                 print('Objective:',self.obj)
