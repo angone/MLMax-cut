@@ -247,7 +247,7 @@ class EmbeddingCoarsening:
         nodes = [i for i in range(n)]
         random.shuffle(nodes)
         change = self.embed(nodes)
-        while count < 31:
+        while change > 0.01 and count < 31:
             change = self.embed(nodes)
             count += 1
         print(count, 'iterations until embedding convergence')
