@@ -618,7 +618,7 @@ class MaxcutSolver:
 
 
 s = time.perf_counter()
-M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S, ratio = args.ratio)
+M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S, ratio = args.sparse)
 M.solve()
 t = time.perf_counter()
 print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
