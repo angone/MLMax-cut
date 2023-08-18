@@ -86,9 +86,15 @@ class EmbeddingCoarsening:
                         minE_v = (v, x)
             w = self.G.weight(u,v)
             if edgeMap[minE_u] > edgeMap[minE_v]:
-                self.G.increaseWeight(minE_u[0], minE_u[1], w)
+                u1 = minE_u[0]
+                u2 = minE_u[1]
+                if self.G.weight(u1, u2) != 0:
+                    self.G.increaseWeight(u1, u2, w)
             else:
-                self.G.increaseWeight(minE_v[0], minE_v[1], w)
+                v1 = minE_v[0]
+                v2 = minE_v[1]
+                if self.G.weight(v1, v2) != 0:
+                    self.G.increaseWeight(v1, v2, w)
             self.G.removeEdge(u, v)
         print(self.G.totalEdgeWeight())
         
