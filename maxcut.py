@@ -593,7 +593,6 @@ class MaxcutSolver:
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
-                print(self.obj)
             else:
                 inputs = [(G, self.solution.copy(), j) for j in range(starts)]
                 max_obj = self.obj
@@ -614,7 +613,7 @@ class MaxcutSolver:
 
         mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
         print('mqlib ratio:',self.obj / mqobj)
-        print('coarse ratio:', self.coarse_obj/self.obj)
+        #print('coarse ratio:', self.coarse_obj/self.obj)
 
 
 s = time.perf_counter()
