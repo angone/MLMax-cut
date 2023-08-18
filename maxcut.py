@@ -90,7 +90,7 @@ class EmbeddingCoarsening:
             else:
                 self.G.increaseWeight(minE_v[0], minE_v[1], w)
             self.G.removeEdge(u, v)
-            print(self.G.weight(u,v))
+        print(self.G.totalEdgeWeight())
         
 
     def nodeObj(self, p, c):
