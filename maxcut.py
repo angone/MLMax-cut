@@ -35,7 +35,7 @@ parser.add_argument("-S", type = str, default = "mqlib", help = "subproblem solv
 parser.add_argument("-f", type = str, default = "elist", help = "graph format")
 parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
-parser.add_argument("-sparse", type = float, default =0, help='ratio to sparsify')
+parser.add_argument("-sparse", type = float, default = 0, help='ratio to sparsify')
 args = parser.parse_args()
 sptime = 0
 flag = True
@@ -561,7 +561,7 @@ class MaxcutSolver:
         print(G)
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
-            E = EmbeddingCoarsening(G, 3,'cube', ratio)
+            E = EmbeddingCoarsening(G, 3,'cube', self.ratio)
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
