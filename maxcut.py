@@ -60,6 +60,7 @@ class EmbeddingCoarsening:
     def sparsify(self, ratio):
         removeCount = int(ratio * self.G.numberOfEdges())
         edgeDist = []
+        edgeMap = {}
         for u,v in self.G.iterEdges():
             w = self.G.weight(u,v)
             d = 0
@@ -67,10 +68,25 @@ class EmbeddingCoarsening:
                 d += (self.space[u][i] - self.space[v][i])**2
             d = w*np.sqrt(d)
             edgeDist.append((d, u, v))
+            edgeMap[(u,v)] = d
+            edgeMap[(v,u)] = d
         edgeDist.sort()
         for i in range(removeCount):
             u = edgeDist[i][1]
             v = edgeDist[i][2]
+            minE_u = None
+            minE_v = None
+            for x in self.G.iterNeighbors(u):
+                if v != x:
+                    if minE_u == None or edgeMap[(u,x)] < edgeMap[minE_u]:
+                        minE_u = (u, x)
+            for x in self.G.iterNeighbors(v):
+                if u != x:
+                    if minE_v == None or edgeMap[(v,x)] < edgeMap[minE_v]:
+                        minE_v = (v, x)
+            w = self.G.weight(u,v)
+            self.G.increaseWeight(minE_u[0], minE_u[1], w/2)
+            self.G.increaseWeight(minE_v[0], minE_v[1], w/2)
             self.G.removeEdge(u, v)
         
 
