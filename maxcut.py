@@ -585,7 +585,7 @@ class MaxcutSolver:
             if self.solver == 'qaoa':
                 sptime -= time.perf_counter()
                 R = Refinement(E.G, self.spsize, 'mqlib', self.solution)
-                R.refineLevel()
+                R.refineCoarse()
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
