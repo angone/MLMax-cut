@@ -534,7 +534,7 @@ class Refinement:
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
-        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceZero)
+        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
         self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
