@@ -569,6 +569,7 @@ class MaxcutSolver:
                 G = E.G
             else:
                 G = self.problem_graph
+            print(G.totalEdgeWeight())
             fineToCoarse = E.mapFineToCoarse
             print('Level',i+1,'Nodes:',G.numberOfNodes(),'Edges:',G.numberOfEdges())
             S = [0 for _ in range(G.numberOfNodes())]
