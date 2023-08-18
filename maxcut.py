@@ -78,13 +78,13 @@ class EmbeddingCoarsening:
             minE_v = None
             for x in self.G.iterNeighbors(u):
                 if v != x:
-                    if minE_u == None or edgeMap[(u,x)] < edgeMap[minE_u]:
+                    if minE_u == None or edgeMap[(u,x)] > edgeMap[minE_u]:
                         minE_u = (u, x)
             for x in self.G.iterNeighbors(v):
                 if u != x:
-                    if minE_v == None or edgeMap[(v,x)] < edgeMap[minE_v]:
+                    if minE_v == None or edgeMap[(v,x)] > edgeMap[minE_v]:
                         minE_v = (v, x)
-            if edgeMap[minE_u] < edgeMap[minE_v]:
+            if edgeMap[minE_u] > edgeMap[minE_v]:
                 self.G.increaseWeight(minE_u[0], minE_u[1], w)
             else:
                 self.G.increaseWeight(minE_v[0], minE_v[1], w)
