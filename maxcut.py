@@ -35,6 +35,7 @@ parser.add_argument("-S", type = str, default = "mqlib", help = "subproblem solv
 parser.add_argument("-f", type = str, default = "elist", help = "graph format")
 parser.add_argument("-e", type = str, default = 'cube', help = 'shape of embedding')
 parser.add_argument("-c", type = int, default = 0, help = 'coarse only')
+parser.add_argument("-sparse", type = float, default =0, help='ratio to sparsify')
 args = parser.parse_args()
 sptime = 0
 flag = True
@@ -48,7 +49,7 @@ def parallel(ref):
     return R.solution, R.obj
 
 class EmbeddingCoarsening:
-    def __init__(self, G, d, shape):
+    def __init__(self, G, d, shape, ratio):
         self.G = G
         self.d = d
         self.n = G.numberOfNodes()
@@ -56,9 +57,12 @@ class EmbeddingCoarsening:
         self.shape = shape
         self.M = set()
         self.R = -1
+        self.ratio = ratio
 
-    def sparsify(self, ratio):
-        removeCount = int(ratio * self.G.numberOfEdges())
+    def sparsify(self):
+        if self.ratio == 0:
+            return
+        removeCount = int(self.ratio * self.G.numberOfEdges())
         edgeDist = []
         edgeMap = {}
         for u,v in self.G.iterEdges():
@@ -96,7 +100,7 @@ class EmbeddingCoarsening:
                 if self.G.weight(v1, v2) != 0:
                     self.G.increaseWeight(v1, v2, w)
             self.G.removeEdge(u, v)
-        print(self.G.totalEdgeWeight())
+
         
 
     def nodeObj(self, p, c):
@@ -258,7 +262,7 @@ class EmbeddingCoarsening:
             change = self.embed(nodes)
             count += 1
         print(count, 'iterations until embedding convergence')
-        self.sparsify(0.2)
+        self.sparsify()
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
@@ -533,7 +537,7 @@ class Refinement:
 
 
 class MaxcutSolver:
-    def __init__(self, fname, sp, solver):
+    def __init__(self, fname, sp, solver, ratio):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
         self.hierarchy = []
         self.hierarchy_map = []
@@ -542,6 +546,7 @@ class MaxcutSolver:
         self.solution = None
         self.obj = 0
         self.start = time.perf_counter()
+        self.ratio = ratio
     
     def noisySolution(self, ratio):
         S = self.solution.copy()
@@ -556,7 +561,7 @@ class MaxcutSolver:
         print(G)
         s = time.perf_counter()
         while G.numberOfNodes() > 2*self.spsize:
-            E = EmbeddingCoarsening(G, 3,'cube')
+            E = EmbeddingCoarsening(G, 3,'cube', ratio)
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
@@ -575,7 +580,6 @@ class MaxcutSolver:
                 G = E.G
             else:
                 G = self.problem_graph
-            print(G.totalEdgeWeight())
             fineToCoarse = E.mapFineToCoarse
             print('Level',i+1,'Nodes:',G.numberOfNodes(),'Edges:',G.numberOfEdges())
             S = [0 for _ in range(G.numberOfNodes())]
@@ -614,7 +618,7 @@ class MaxcutSolver:
 
 
 s = time.perf_counter()
-M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S)
+M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S, ratio = args.ratio)
 M.solve()
 t = time.perf_counter()
 print('Found obj for',args.g,'of', M.obj, 'in', t-s, 's')
