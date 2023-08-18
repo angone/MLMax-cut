@@ -145,10 +145,8 @@ class EmbeddingCoarsening:
                 o += w * (self.space[u][i] - self.space[v][i])**2
         print('Current Obj (to be minimized):',o)
 
-    def embed(self):
+    def embed(self, nodes):
         n = self.G.numberOfNodes()
-        nodes = [i for i in range(n)]
-        random.shuffle(nodes)
         change = 0
         for i in nodes:
             res, c = self.optimal(i)
@@ -227,13 +225,15 @@ class EmbeddingCoarsening:
         self.mapCoarseToFine = {}
         self.mapFineToCoarse = {}
         idx = 0
-        change = self.embed()
         count = 1
-        while change > 0.01:
-            change = self.embed()
+        nodes = [i for i in range(n)]
+        random.shuffle(nodes)
+        change = self.embed(nodes)
+        while count < 31:
+            change = self.embed(nodes)
             count += 1
         print(count, 'iterations until embedding convergence')
-        self.sparsify(0.1)
+        self.sparsify(0.2)
         self.match()
         for u, v in self.M:
             self.mapCoarseToFine[idx] = [u, v]
@@ -509,7 +509,7 @@ class Refinement:
 
 class MaxcutSolver:
     def __init__(self, fname, sp, solver):
-        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
+        self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceZero)
         self.hierarchy = []
         self.hierarchy_map = []
         self.spsize = sp
