@@ -74,7 +74,7 @@ class EmbeddingCoarsening:
         for i in range(removeCount):
             u = edgeDist[i][1]
             v = edgeDist[i][2]
-            minE_u = None
+            '''minE_u = None
             minE_v = None
             for x in self.G.iterNeighbors(u):
                 if v != x:
@@ -88,7 +88,7 @@ class EmbeddingCoarsening:
             if edgeMap[minE_u] > edgeMap[minE_v]:
                 self.G.increaseWeight(minE_u[0], minE_u[1], w)
             else:
-                self.G.increaseWeight(minE_v[0], minE_v[1], w)
+                self.G.increaseWeight(minE_v[0], minE_v[1], w)'''
             self.G.removeEdge(u, v)
         
 
