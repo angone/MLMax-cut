@@ -22,10 +22,12 @@ from qiskit.algorithms import QAOA
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 import pstats
 import math
+import warnings
 T = 0
+warnings.filterwarnings("ignore")
 
-random.seed(int(time.perf_counter()))
-np.random.seed(int(time.perf_counter()))
+random.seed(0)
+np.random.seed(0)
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
@@ -41,10 +43,10 @@ sptime = 0
 flag = True
 
 def parallel(ref):
-    s = int(time.perf_counter()*ref[2])
+    s = int(ref[2])
     random.seed(s)
     np.random.seed(s)
-    R = Refinement(ref[0], args.sp, 'mqlib', ref[1])
+    R = Refinement(ref[0], args.sp, args.S, ref[1])
     R.refineLevel()
     return R.solution, R.obj
 
@@ -302,7 +304,7 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution = self.mqlibSolve(5, G=self.G)
+        self.solution = self.mqlibSolve(20, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
         return self.obj
@@ -314,7 +316,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.1, G=None):
+    def mqlibSolve(self, t=0.25, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -335,8 +337,8 @@ class Refinement:
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
         return (res['solution']+1)/2 
 
-    def qaoa(self, p=3):
-        n = self.G.numberOfNodes()
+    def qaoa(self, p=3, G=None):
+        n = G.numberOfNodes()
         G = nw.nxadapter.nk2nx(G)
         w = nx.adjacency_matrix(G)
         problem = QuadraticProgram()
@@ -472,32 +474,13 @@ class Refinement:
 
         return (subprob, mapProbToSubProb, idx)
 
-    def fixSolution(self):
-        #done = False
-        #while not done:
-        #    done =  True
-        for i in range(self.n):
-            if self.gainmap[i] > 0:
-        #        done = False
-                self.solution[i] = 1 - self.solution[i]
-                self.gainmap[i] = 0
-                for v in self.G.iterNeighbors(i):
-                    w = self.G.weight(v, i)
-                    if self.solution[v] == self.solution[i]:
-                        self.gainmap[i] += w
-                        self.gainmap[v] += 2*w
-                    else:
-                        self.gainmap[i] -= w
-                        self.gainmap[v] -= 2*w
-        self.obj = self.calc_obj(self.G, self.solution)
-        return
 
     def refine(self):
         while not self.done:
             subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
-                S =self.qaoa(p=3)
+                S =self.qaoa(p=3, G=subprob[0])
             else:
                 S = self.mqlibSolve(G=subprob[0])
             new_sol = self.solution.copy()
@@ -560,7 +543,7 @@ class MaxcutSolver:
         G = nw.graphtools.toWeighted(self.problem_graph)
         print(G)
         s = time.perf_counter()
-        while G.numberOfNodes() > 2*self.spsize:
+        while G.numberOfNodes() > self.spsize:
             E = EmbeddingCoarsening(G, 3,'cube', self.ratio)
             E.coarsen()
             print(E.cG)
@@ -586,15 +569,15 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
-            if self.solver == 'qaoa':
+            if False:
                 sptime -= time.perf_counter()
-                R = Refinement(G, self.spsize, 'mqlib', self.solution)
+                R = Refinement(G, self.spsize, 'qaoa', self.solution)
                 R.refineLevel()
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
             else:
-                inputs = [(G, self.solution.copy(), j) for j in range(starts)]
+                inputs = [(G, self.solution.copy(), j, self.solver) for j in range(starts)]
                 max_obj = self.obj
                 max_sol = self.solution
 
@@ -611,8 +594,8 @@ class MaxcutSolver:
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
 
-        mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
-        print('mqlib ratio:',self.obj / mqobj)
+       # mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
+       # print('mqlib ratio:',self.obj / mqobj)
         #print('coarse ratio:', self.coarse_obj/self.obj)
 
 
