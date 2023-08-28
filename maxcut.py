@@ -317,7 +317,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.1, G=None):
+    def mqlibSolve(self, t=1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
