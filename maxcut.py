@@ -305,7 +305,7 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution = self.mqlibSolve(20, G=self.G)
+        self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
         return self.obj
@@ -317,7 +317,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.25, G=None):
+    def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -550,12 +550,7 @@ class Refinement:
     def refineLevel(self):
         ct = 0
         obj = 0
-        while self.passes < self.bound:
-            self.refine()
-            self.done = False
-            self.passes += 1
-            self.locked_nodes = set()
-            self.buildGain()
+        self.refine()
             
 
 
@@ -609,9 +604,9 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
-            if False:
+            if True:
                 sptime -= time.perf_counter()
-                R = Refinement(G, self.spsize, 'qaoa', self.solution)
+                R = Refinement(G, self.spsize, self.solver, self.solution)
                 R.refineLevel()
                 sptime += time.perf_counter()
                 self.solution = R.solution
