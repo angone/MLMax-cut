@@ -390,8 +390,8 @@ class Refinement:
     def randGainSubProb(self):
         sample_size = max(int(self.n * 0.2), self.spsize)
         sample = random.sample(range(self.n), sample_size)
-        nodes = [(self.gainmap[i], i) for i in sample]
-        nodes.sort(reverse=True)
+        nodes = [i for i in sample]
+        nodes.sort(reverse=True, key=lambda x: self.gainmap[x])
         spnodes = nodes[:self.spsize]
 
         subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
