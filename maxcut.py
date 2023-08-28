@@ -307,8 +307,6 @@ class Refinement:
     def refine_coarse(self):
         self.solution, obj = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
-        print('Coarse Level:',self.obj)
-        print('compare:', obj)
         return self.obj
 
     def calc_obj(self, G, solution):
@@ -522,7 +520,6 @@ class Refinement:
             keys = mapProbToSubProb.keys()
             for i in keys:
                 new_sol[i] = S[mapProbToSubProb[i]]
-            print('mq:',new_obj)
             changed = set()
             for u in self.last_subprob:
                 if self.solution[u] != new_sol[u]:
@@ -537,7 +534,6 @@ class Refinement:
                         else:
                             new_obj += w
             count += 1
-            print('manual:',new_obj)
             if new_obj >= self.obj:
                 self.updateGain(new_sol, changed)
                 self.solution = new_sol.copy()
