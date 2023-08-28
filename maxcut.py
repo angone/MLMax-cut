@@ -305,9 +305,10 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution = self.mqlibSolve(5, G=self.G)
+        self.solution, obj = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
+        print('compare:', obj)
         return self.obj
 
     def calc_obj(self, G, solution):
