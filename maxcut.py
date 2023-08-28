@@ -406,7 +406,6 @@ class Refinement:
 
 
             keys = mapProbToSubProb.keys()
-            total = 0
             j = 0
             while j < len(spnodes):
                 u = spnodes[j]
@@ -423,10 +422,10 @@ class Refinement:
                         spv = mapProbToSubProb[v]
                         if u < v:
                             subprob.increaseWeight(spu, spv, w)
-                    total += w
                 j += 1
+            total = subprob.totalEdgeWeight()
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-            print(total, subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
+            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
             return (subprob, mapProbToSubProb, idx)
 
 
