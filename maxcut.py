@@ -305,7 +305,7 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution = self.mqlibSolve(5, G=self.G)
+        self.solution = self.mqlibSolve(20, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
         return self.obj
@@ -317,7 +317,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.1, G=None):
+    def mqlibSolve(self, t=0.25, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -372,66 +372,34 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        #self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
+        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
            
-    def updateGain(self, S, changed):
+    def updateGain(self, S):
+        used = set()
+        if self.last_subprob == None:
+            return
+        changed = set()
+        to_update = set()
+        for u in self.last_subprob:
+            if u not in self.locked_nodes:
+                self.locked_nodes.add(u)
+            if S[u] != self.solution[u]:
+                changed.add(u)
         for u in changed:
             for v in self.G.iterNeighbors(u):
-                    if v in changed:
-                        continue
-                    w = 2*self.G.weight(u,v)
+                if v not in self.locked_nodes:
+                    if v in self.gainlist:
+                        self.gainlist.remove(v)
+                    w = 2*self.G.weight(u,v)*(1+self.alpha)
                     if S[u] == S[v]:
                         self.gainmap[v] += w
-                        self.gainmap[u] += w
                     else:
                         self.gainmap[v] -= w       
-                        self.gainmap[u] -= w
+        for u in to_update:
+            self.gainlist.add(u)
          
-    def randGainSubProb(self):
-        sample_size = max(int(self.n * 0.2), self.spsize)
-        sample = random.sample(range(self.n), sample_size)
-        nodes = [i for i in sample]
-        nodes.sort(key=lambda x: self.gainmap[x])
-        spnodes = nodes[:self.spsize]
-
-        subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
-        mapProbToSubProb = {}
-        i = 0
-        idx =0
-        change = set()
-        while i < len(spnodes):
-            u = spnodes[i]
-            change.add(u)
-            mapProbToSubProb[u] = idx
-            idx += 1
-            i += 1
-        self.last_subprob = spnodes
 
 
-        keys = mapProbToSubProb.keys()
-        total = 0
-        j = 0
-        while j < len(spnodes):
-            u = spnodes[j]
-            spu = mapProbToSubProb[u]
-            for v in self.G.iterNeighbors(u):
-                w = self.G.weight(u,v)
-                if v not in keys:
-                    if self.solution[v] == 0:
-                        spv = idx
-                    else:
-                        spv = idx + 1
-                    subprob.increaseWeight(spu, spv, w)
-                else:
-                    spv = mapProbToSubProb[v]
-                    if u < v:
-                        subprob.increaseWeight(spu, spv, w)
-                total += w
-            j += 1
-
-        subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-
-        return (subprob, mapProbToSubProb, idx)
 
     def lockGainSubProb(self, spnodes=None):
         if spnodes != None:
@@ -512,9 +480,8 @@ class Refinement:
 
 
     def refine(self):
-        count = 0
-        while count < 3:
-            subprob = self.randGainSubProb()
+        while not self.done:
+            subprob = self.lockGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
                 S =self.qaoa(p=3, G=subprob[0])
@@ -539,20 +506,21 @@ class Refinement:
                             new_obj -= w
                         else:
                             new_obj += w
-            count += 1
-            self.updateGain(new_sol, changed)
-            self.solution = new_sol.copy()
-            new_obj = self.calc_obj(self.G, new_sol)
-            print('new:',new_obj)
-            if new_obj > self.obj:
-                count = 0
+            print(new_obj - self.obj)
+            if new_obj >= self.obj:
                 self.obj = new_obj
-
+                self.updateGain(new_sol)
+                self.solution = new_sol.copy()
             
     def refineLevel(self):
         ct = 0
         obj = 0
-        self.refine()
+        while self.passes < self.bound:
+            self.refine()
+            self.done = False
+            self.passes += 1
+            self.locked_nodes = set()
+            self.buildGain()
             
 
 
@@ -608,7 +576,7 @@ class MaxcutSolver:
             self.solution = S
             if True:
                 sptime -= time.perf_counter()
-                R = Refinement(G, self.spsize, self.solver, self.solution)
+                R = Refinement(G, self.spsize, 'qaoa', self.solution)
                 R.refineLevel()
                 sptime += time.perf_counter()
                 self.solution = R.solution
