@@ -305,7 +305,7 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution = self.mqlibSolve(20, G=self.G)
+        self.solution = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         print('Coarse Level:',self.obj)
         return self.obj
@@ -317,7 +317,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.25, G=None):
+    def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -538,6 +538,7 @@ class Refinement:
                         else:
                             new_obj += w
             count += 1
+            print(new_obj)
             if new_obj >= self.obj:
                 self.updateGain(new_sol, changed)
                 self.solution = new_sol.copy()
