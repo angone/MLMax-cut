@@ -548,7 +548,7 @@ class Refinement:
             
     def refineLevel(self):
         self.refine()
-        print('global:', self.calc_obj(self.G, self.mqlibSolve(t=10, G=self.G)))
+        #print('global:', self.calc_obj(self.G, self.mqlibSolve(t=10, G=self.G)))
 
             
 
