@@ -385,7 +385,10 @@ class Refinement:
                         self.gainmap[v] -= w       
          
     def randGainSubProb(self):
-            sample_size = min(5*self.spsize, self.n)
+            if self.n >= 2*self.spsize:
+                sample_size = max(int(0.2*self.n), 2*self.spsize)
+            else:
+                sample_size = self.n
             sample = random.sample(range(self.n), sample_size)
             nodes = [i for i in sample]
             nodes.sort(reverse=True, key=lambda x: self.gainmap[x])
