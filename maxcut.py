@@ -398,7 +398,51 @@ class Refinement:
         for u in to_update:
             self.gainlist.add(u)
          
+    def randGainSubProb(self):
+            sample_size = max(int(self.n * 0.2), self.spsize)
+            sample = random.sample(range(self.n), sample_size)
+            nodes = [i for i in sample]
+            nodes.sort(key=lambda x: self.gainmap[x])
+            spnodes = nodes[:self.spsize]
 
+            subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
+            mapProbToSubProb = {}
+            i = 0
+            idx =0
+            change = set()
+            while i < len(spnodes):
+                u = spnodes[i]
+                change.add(u)
+                mapProbToSubProb[u] = idx
+                idx += 1
+                i += 1
+            self.last_subprob = spnodes
+
+
+            keys = mapProbToSubProb.keys()
+            total = 0
+            j = 0
+            while j < len(spnodes):
+                u = spnodes[j]
+                spu = mapProbToSubProb[u]
+                for v in self.G.iterNeighbors(u):
+                    w = self.G.weight(u,v)
+                    if v not in keys:
+                        if self.solution[v] == 0:
+                            spv = idx
+                        else:
+                            spv = idx + 1
+                        subprob.increaseWeight(spu, spv, w)
+                    else:
+                        spv = mapProbToSubProb[v]
+                        if u < v:
+                            subprob.increaseWeight(spu, spv, w)
+                    total += w
+                j += 1
+
+            subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
+
+            return (subprob, mapProbToSubProb, idx)
 
 
     def lockGainSubProb(self, spnodes=None):
@@ -480,8 +524,9 @@ class Refinement:
 
 
     def refine(self):
-        while not self.done:
-            subprob = self.lockGainSubProb()
+        count = 0
+        while count < 3:
+            subprob = self.randGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
                 S =self.qaoa(p=3, G=subprob[0])
@@ -506,21 +551,19 @@ class Refinement:
                             new_obj -= w
                         else:
                             new_obj += w
-            print(new_obj - self.obj)
             if new_obj >= self.obj:
-                self.obj = new_obj
+                count += 1
                 self.updateGain(new_sol)
                 self.solution = new_sol.copy()
+                if new_obj > self.obj:
+                    count = 0
+                    self.obj = new_obj
             
     def refineLevel(self):
         ct = 0
         obj = 0
-        while self.passes < self.bound:
-            self.refine()
-            self.done = False
-            self.passes += 1
-            self.locked_nodes = set()
-            self.buildGain()
+        self.refine()
+
             
 
 
