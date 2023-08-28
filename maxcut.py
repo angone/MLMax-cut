@@ -372,32 +372,67 @@ class Refinement:
             else:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
-        self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
+        #self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
            
-    def updateGain(self, S):
-        used = set()
-        if self.last_subprob == None:
-            return
-        changed = set()
-        to_update = set()
-        for u in self.last_subprob:
-            if u not in self.locked_nodes:
-                self.locked_nodes.add(u)
-            if S[u] != self.solution[u]:
-                changed.add(u)
+    def updateGain(self, S, changed):
         for u in changed:
             for v in self.G.iterNeighbors(u):
-                if v not in self.locked_nodes:
-                    if v in self.gainlist:
-                        self.gainlist.remove(v)
-                    w = 2*self.G.weight(u,v)*(1+self.alpha)
+                    if v in changed:
+                        continue
+                    w = 2*self.G.weight(u,v)
                     if S[u] == S[v]:
                         self.gainmap[v] += w
+                        self.gainmap[u] += w
                     else:
                         self.gainmap[v] -= w       
-        for u in to_update:
-            self.gainlist.add(u)
+                        self.gainmap[u] -= w
          
+    def randGainSubProb(self):
+        sample_size = max(int(self.n * 0.2), self.spsize)
+        sample = random.sample(range(self.n), sample_size)
+        nodes = [(self.gainmap[i], i) for i in sample]
+        nodes.sort(reverse=True)
+        spnodes = nodes[:self.spsize]
+
+        subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
+        mapProbToSubProb = {}
+        i = 0
+        idx =0
+        change = set()
+        while i < len(spnodes):
+            u = spnodes[i]
+            change.add(u)
+            mapProbToSubProb[u] = idx
+            idx += 1
+            i += 1
+        self.last_subprob = spnodes
+
+
+        keys = mapProbToSubProb.keys()
+        total = 0
+        j = 0
+        while j < len(spnodes):
+            u = spnodes[j]
+            spu = mapProbToSubProb[u]
+            for v in self.G.iterNeighbors(u):
+                w = self.G.weight(u,v)
+                if v not in keys:
+                    if self.solution[v] == 0:
+                        spv = idx
+                    else:
+                        spv = idx + 1
+                    subprob.increaseWeight(spu, spv, w)
+                else:
+                    spv = mapProbToSubProb[v]
+                    if u < v:
+                        subprob.increaseWeight(spu, spv, w)
+                total += w
+            j += 1
+
+        subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
+
+        return (subprob, mapProbToSubProb, idx)
+
     def lockGainSubProb(self, spnodes=None):
         if spnodes != None:
             spsize = len(spnodes)
@@ -477,8 +512,9 @@ class Refinement:
 
 
     def refine(self):
-        while not self.done:
-            subprob = self.lockGainSubProb()
+        count = 0
+        while count < 3:
+            subprob = self.randGainSubProb()
             mapProbToSubProb = subprob[1]
             if self.solver == 'qaoa':
                 S =self.qaoa(p=3, G=subprob[0])
@@ -503,10 +539,13 @@ class Refinement:
                             new_obj -= w
                         else:
                             new_obj += w
+            count += 1
+            self.updateGain(new_sol, changed)
+            self.solution = new_sol.copy()
             if new_obj >= self.obj:
+                count = 0
                 self.obj = new_obj
-                self.updateGain(new_sol)
-                self.solution = new_sol.copy()
+
             
     def refineLevel(self):
         ct = 0
