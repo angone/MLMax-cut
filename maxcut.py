@@ -548,6 +548,7 @@ class Refinement:
             
     def refineLevel(self):
         self.refine()
+        print('global:', self.mqlibSolve(t=10, G=self.G))
 
             
 
