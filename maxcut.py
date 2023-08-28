@@ -425,9 +425,8 @@ class Refinement:
                             subprob.increaseWeight(spu, spv, w)
                     total += w
                 j += 1
-
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
+            print(total, subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
             return (subprob, mapProbToSubProb, idx)
 
 
