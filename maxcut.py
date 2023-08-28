@@ -576,7 +576,7 @@ class MaxcutSolver:
             self.solution = S
             if True:
                 sptime -= time.perf_counter()
-                R = Refinement(G, self.spsize, 'qaoa', self.solution)
+                R = Refinement(G, self.spsize, self.solver, self.solution)
                 R.refineLevel()
                 sptime += time.perf_counter()
                 self.solution = R.solution
