@@ -598,12 +598,10 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
-            if True:
+            if False:
                 sptime -= time.perf_counter()
                 R = Refinement(G, self.spsize, self.solver, self.solution)
-                print('before:',R.calc_obj(G, self.solution))
                 R.refineLevel()
-                print('after:', R.calc_obj(G, R.solution))
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
