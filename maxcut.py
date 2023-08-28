@@ -317,7 +317,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=1, G=None):
+    def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -385,7 +385,7 @@ class Refinement:
                         self.gainmap[v] -= w       
          
     def randGainSubProb(self):
-            sample_size = max(int(self.n * 0.2), self.n)
+            sample_size = min(5*self.spsize, self.n)
             sample = random.sample(range(self.n), sample_size)
             nodes = [i for i in sample]
             nodes.sort(reverse=True, key=lambda x: self.gainmap[x])
@@ -427,7 +427,7 @@ class Refinement:
                 j += 1
 
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-
+            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight, 'should be equal')
             return (subprob, mapProbToSubProb, idx)
 
 
