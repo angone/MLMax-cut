@@ -53,6 +53,7 @@ def parallel(ref):
 class EmbeddingCoarsening:
     def __init__(self, G, d, shape, ratio):
         self.G = G
+        self.sG = nw.graphtools.toWeighted(G)
         self.d = d
         self.n = G.numberOfNodes()
         self.space = np.random.rand(self.n, d)
@@ -64,11 +65,11 @@ class EmbeddingCoarsening:
     def sparsify(self):
         if self.ratio == 0:
             return
-        removeCount = int(self.ratio * self.G.numberOfEdges())
+        removeCount = int(self.ratio * self.sG.numberOfEdges())
         edgeDist = []
         edgeMap = {}
-        for u,v in self.G.iterEdges():
-            w = self.G.weight(u,v)
+        for u,v in self.sG.iterEdges():
+            w = self.sG.weight(u,v)
             d = 0
             for i in range(self.d):
                 d += (self.space[u][i] - self.space[v][i])**2
@@ -82,26 +83,26 @@ class EmbeddingCoarsening:
             v = edgeDist[i][2]
             minE_u = None
             minE_v = None
-            for x in self.G.iterNeighbors(u):
+            for x in self.sG.iterNeighbors(u):
                 if v != x:
-                    if minE_u == None or edgeMap[(u,x)] > edgeMap[minE_u]:
+                    if minE_u == None or edgeMap[(u,x)] < edgeMap[minE_u]:
                         minE_u = (u, x)
-            for x in self.G.iterNeighbors(v):
+            for x in self.sG.iterNeighbors(v):
                 if u != x:
-                    if minE_v == None or edgeMap[(v,x)] > edgeMap[minE_v]:
+                    if minE_v == None or edgeMap[(v,x)] < edgeMap[minE_v]:
                         minE_v = (v, x)
-            w = self.G.weight(u,v)
-            if edgeMap[minE_u] > edgeMap[minE_v]:
+            w = self.sG.weight(u,v)
+            if minE_u != None and (minE_v == None or edgeMap[minE_u] < edgeMap[minE_v]):
                 u1 = minE_u[0]
                 u2 = minE_u[1]
-                if self.G.weight(u1, u2) != 0:
-                    self.G.increaseWeight(u1, u2, w)
-            else:
+                if self.sG.weight(u1, u2) != 0:
+                    self.sG.increaseWeight(u1, u2, w)
+            elif minE_v != None and (minE_u == None or edgeMap[minE_v] < edgeMap[minE_u]):
                 v1 = minE_v[0]
                 v2 = minE_v[1]
-                if self.G.weight(v1, v2) != 0:
-                    self.G.increaseWeight(v1, v2, w)
-            self.G.removeEdge(u, v)
+                if self.sG.weight(v1, v2) != 0:
+                    self.sG.increaseWeight(v1, v2, w)
+            self.sG.removeEdge(u, v)
 
         
 
@@ -121,14 +122,14 @@ class EmbeddingCoarsening:
         return [x, y, z]    
 
     def optimal(self, u):
-        k = 2*self.G.weightedDegree(u)
+        k = 2*self.sG.weightedDegree(u)
         a = 1
         b = -2*k
         c = k**2
         X = self.space[u]
         temp = [0 for _ in range(self.d)]
-        for v in self.G.iterNeighbors(u):
-            w = self.G.weight(u, v)
+        for v in self.sG.iterNeighbors(u):
+            w = self.sG.weight(u, v)
             for i in range(self.d):
                 temp[i] += 2*w*self.space[v][i]
         for i in range(self.d):
@@ -149,7 +150,7 @@ class EmbeddingCoarsening:
             return p1
         p1d = 0
         p2d = 0
-        for v in self.G.iterNeighbors(u):
+        for v in self.sG.iterNeighbors(u):
             t1 = 0
             t2 = 0
             x = self.space[v]
@@ -171,13 +172,13 @@ class EmbeddingCoarsening:
 
     def coarseObj(self):
         o = 0
-        for u, v, w in self.G.iterEdgesWeights():
+        for u, v, w in self.sG.iterEdgesWeights():
             for i in range(self.d):
                 o += w * (self.space[u][i] - self.space[v][i])**2
         print('Current Obj (to be minimized):',o)
 
     def embed(self, nodes):
-        n = self.G.numberOfNodes()
+        n = self.sG.numberOfNodes()
         change = 0
         for i in nodes:
             res, c = self.optimal(i)
@@ -186,7 +187,7 @@ class EmbeddingCoarsening:
         return change/n
     
     def match(self):
-        n = self.G.numberOfNodes()
+        n = self.sG.numberOfNodes()
         tree = KDTree(self.space)
         ind = tree.query_radius(self.space, 0)
         used = set()
@@ -236,7 +237,7 @@ class EmbeddingCoarsening:
             if idx not in used:
                 for j in ind[i]:
                     jdx = indices[j]
-                    if jdx not in used and idx != jdx and (ct >=10 or not self.G.hasEdge(idx, jdx)):
+                    if jdx not in used and idx != jdx and (ct >=10 or not self.sG.hasEdge(idx, jdx)):
                         self.M.add((idx, jdx))
                         used.add(idx)
                         used.add(jdx)
@@ -250,7 +251,7 @@ class EmbeddingCoarsening:
             self.M.add((unused[2*i], unused[2*i + 1]))
 
     def coarsen(self):
-        n = self.G.numberOfNodes()
+        n = self.sG.numberOfNodes()
         i = 0
         j = int(n/2)
         self.mapCoarseToFine = {}
@@ -276,7 +277,7 @@ class EmbeddingCoarsening:
             self.mapFineToCoarse[self.R] = idx
             idx += 1
         self.cG = nw.graph.Graph(n=idx, weighted=True, directed=False)
-        for u,v in self.G.iterEdges():
+        for u,v in self.sG.iterEdges():
             cu = self.mapFineToCoarse[u]
             cv = self.mapFineToCoarse[v]
             self.cG.increaseWeight(cu, cv, self.G.weight(u, v))
@@ -298,8 +299,8 @@ class Refinement:
         self.unused = SortedKeyList([i for i in range(self.n)])
         self.locked_nodes = set()
         self.alpha = 0.2
-        self.randomness = 1
-        self.bound = 2
+        self.randomness = 1.5
+        self.bound = 3
         self.increase = -1
         self.done = False
         
@@ -580,7 +581,6 @@ class MaxcutSolver:
                 inputs = [(G, self.solution.copy(), j, self.solver) for j in range(starts)]
                 max_obj = self.obj
                 max_sol = self.solution
-
                 pool = multiprocessing.Pool()
                 sptime -= time.perf_counter()
                 outputs = pool.map(parallel, inputs)
@@ -593,7 +593,7 @@ class MaxcutSolver:
                 self.obj = max_obj
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
-
+        print(R.calc_obj(self.problem_graph, self.solution))
        # mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
        # print('mqlib ratio:',self.obj / mqobj)
         #print('coarse ratio:', self.coarse_obj/self.obj)
