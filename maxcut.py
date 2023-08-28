@@ -26,8 +26,8 @@ import warnings
 T = 0
 warnings.filterwarnings("ignore")
 
-random.seed(0)
-np.random.seed(0)
+random.seed(int(time.perf_counter()))
+np.random.seed(int(time.perf_counter()))
 faulthandler.enable()
 
 parser = argparse.ArgumentParser()
