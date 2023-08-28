@@ -374,29 +374,15 @@ class Refinement:
                 self.gainmap[v] -= w
         self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
            
-    def updateGain(self, S):
-        used = set()
-        if self.last_subprob == None:
-            return
-        changed = set()
-        to_update = set()
-        for u in self.last_subprob:
-            if u not in self.locked_nodes:
-                self.locked_nodes.add(u)
-            if S[u] != self.solution[u]:
-                changed.add(u)
+    def updateGain(self, S, changed):
         for u in changed:
             for v in self.G.iterNeighbors(u):
-                if v not in self.locked_nodes:
-                    if v in self.gainlist:
-                        self.gainlist.remove(v)
+                if v not in changed:
                     w = 2*self.G.weight(u,v)*(1+self.alpha)
                     if S[u] == S[v]:
                         self.gainmap[v] += w
                     else:
                         self.gainmap[v] -= w       
-        for u in to_update:
-            self.gainlist.add(u)
          
     def randGainSubProb(self):
             sample_size = max(int(self.n * 0.2), self.spsize)
