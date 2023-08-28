@@ -43,7 +43,7 @@ sptime = 0
 flag = True
 
 def parallel(ref):
-    s = int(ref[2])
+    s = int(time.perf_counter() * ref[2])
     random.seed(s)
     np.random.seed(s)
     R = Refinement(ref[0], args.sp, args.S, ref[1])
