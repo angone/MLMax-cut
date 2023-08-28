@@ -625,7 +625,8 @@ class MaxcutSolver:
                 print('Objective:',self.obj)
                 starts = max(2, int(starts/2))
         print(R.calc_obj(self.problem_graph, self.solution))
-        mqobj = R.calc_obj(self.problem_graph, R.mqlibSolve(t=sptime,G=self.problem_graph))
+        mqsol, _ = R.mqlibSolve(t=sptime,G=self.problem_graph)
+        mqobj = R.calc_obj(self.problem_graph, mqsol)
         print('mqlib ratio:',self.obj / mqobj)
         #print('coarse ratio:', self.coarse_obj/self.obj)
 
