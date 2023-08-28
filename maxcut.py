@@ -537,9 +537,8 @@ class Refinement:
                             new_obj -= w
                         else:
                             new_obj += w
-            print(new_obj)
+            count += 1
             if new_obj >= self.obj:
-                count += 1
                 self.updateGain(new_sol, changed)
                 self.solution = new_sol.copy()
                 if new_obj > self.obj:
@@ -607,7 +606,9 @@ class MaxcutSolver:
             if True:
                 sptime -= time.perf_counter()
                 R = Refinement(G, self.spsize, self.solver, self.solution)
+                print('before:',R.calc_obj(G, self.solution))
                 R.refineLevel()
+                print('after:', R.calc_obj(G, R.solution))
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
