@@ -543,6 +543,7 @@ class Refinement:
             count += 1
             self.updateGain(new_sol, changed)
             self.solution = new_sol.copy()
+            new_obj = self.calc_obj(self.G, new_sol)
             print('new:',new_obj)
             if new_obj > self.obj:
                 count = 0
