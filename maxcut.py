@@ -388,7 +388,7 @@ class Refinement:
             sample_size = max(int(self.n * 0.2), self.spsize)
             sample = random.sample(range(self.n), sample_size)
             nodes = [i for i in sample]
-            nodes.sort(key=lambda x: self.gainmap[x])
+            nodes.sort(reverse=True, key=lambda x: self.gainmap[x])
             spnodes = nodes[:self.spsize]
 
             subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
