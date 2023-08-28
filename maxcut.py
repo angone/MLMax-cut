@@ -336,6 +336,8 @@ class Refinement:
         def f(s):
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
+        print(res)
+        exit()
         return (res['solution']+1)/2 
 
     def qaoa(self, p=3, G=None):
@@ -425,7 +427,6 @@ class Refinement:
                 j += 1
             total = subprob.totalEdgeWeight()
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
             return (subprob, mapProbToSubProb, idx)
 
 
