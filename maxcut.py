@@ -336,9 +336,8 @@ class Refinement:
         def f(s):
             return 1
         res = mq.runHeuristic("BURER2002", i, t, f, 100)
-        print(res)
-        exit()
-        return (res['solution']+1)/2 
+
+        return (res['solution']+1)/2, res['objval']
 
     def qaoa(self, p=3, G=None):
         n = G.numberOfNodes()
@@ -516,13 +515,13 @@ class Refinement:
             if self.solver == 'qaoa':
                 S =self.qaoa(p=3, G=subprob[0])
             else:
-                S = self.mqlibSolve(G=subprob[0])
+                S, new_obj = self.mqlibSolve(G=subprob[0])
             new_sol = self.solution.copy()
             
             keys = mapProbToSubProb.keys()
             for i in keys:
                 new_sol[i] = S[mapProbToSubProb[i]]
-
+            print('mq:',new_obj)
             changed = set()
             for u in self.last_subprob:
                 if self.solution[u] != new_sol[u]:
@@ -537,7 +536,7 @@ class Refinement:
                         else:
                             new_obj += w
             count += 1
-            print(new_obj)
+            print('manual:',new_obj)
             if new_obj >= self.obj:
                 self.updateGain(new_sol, changed)
                 self.solution = new_sol.copy()
