@@ -531,7 +531,6 @@ class Refinement:
                 if self.solution[u] != new_sol[u]:
                     changed.add(u)
             new_obj = self.obj
-            print(changed)
             for u in changed:
                 for v in self.G.iterNeighbors(u):
                     if v not in changed:
