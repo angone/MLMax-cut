@@ -427,7 +427,7 @@ class Refinement:
                 j += 1
 
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight, 'should be equal')
+            print(subprob.totalEdgeWeight(), self.G.totalEdgeWeight())
             return (subprob, mapProbToSubProb, idx)
 
 
