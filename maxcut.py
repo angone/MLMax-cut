@@ -546,8 +546,6 @@ class Refinement:
                     self.obj = new_obj
             
     def refineLevel(self):
-        ct = 0
-        obj = 0
         self.refine()
 
             
