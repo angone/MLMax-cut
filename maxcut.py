@@ -15,14 +15,16 @@ import MQLib as mq
 import multiprocessing
 import cProfile
 import resource
-from qiskit_optimization import QuadraticProgram
-from qiskit.algorithms.optimizers import COBYLA
+#from qiskit_optimization import QuadraticProgram
+#from qiskit.algorithms.optimizers import COBYLA
 from qiskit import BasicAer
 from qiskit.algorithms import QAOA
-from qiskit_optimization.algorithms import MinimumEigenOptimizer
+#from qiskit_optimization.algorithms import MinimumEigenOptimizer
 import pstats
 import math
 import warnings
+from karateclub.graph_embedding import Graph2Vec
+from qiskit.optimization.applications.ising import max_cut
 T = 0
 warnings.filterwarnings("ignore")
 
@@ -41,6 +43,81 @@ parser.add_argument("-sparse", type = float, default = 0, help='ratio to sparsif
 args = parser.parse_args()
 sptime = 0
 flag = True
+
+def matrices_to_graphs(matrix_list):
+    g_list = []
+    for matrix in matrix_list:
+        array = np.array(matrix)
+        g = nx.from_numpy_array(array)
+        g_list.append(g)
+    return g_list
+
+print('Loading model...')
+training_file = open("29260_40_node_random_graphs.txt")
+training_matrix_list = np.loadtxt(training_file).reshape(29260,40,40)
+training_graph_list = matrices_to_graphs(training_matrix_list)
+print('Completed')
+print('Fitting model...')
+model = Graph2Vec(epochs=100, learning_rate=0.065)
+model.fit(training_graph_list)
+model_array = model.get_embedding()
+print('Completed')
+
+
+def find_indices(vector):
+    length = len(vector)
+    sorted_vector = sorted(vector)
+    max_value = sorted_vector[length-1]
+    second_max_value = sorted_vector[length - 2]
+    third_max_value = sorted_vector[length - 3]
+    
+    min_value = sorted_vector[0]
+    second_min_value = sorted_vector[1]
+    third_min_value = sorted_vector[2]
+
+    for i in range(len(vector)):
+        if vector[i] == max_value:
+            max_index = vector.index(vector[i])
+        if vector[i] == second_max_value:
+            second_max_index = vector.index(vector[i])
+        if vector[i] == third_max_value:
+            third_max_index = vector.index(vector[i])
+        if vector[i] == min_value:
+            min_index = vector.index(vector[i])
+        if vector[i] == second_min_value:
+            second_min_index = vector.index(vector[i])
+        if vector[i] == third_min_value:
+            third_min_index = vector.index(vector[i])
+        else:
+            continue
+            
+    indices = [min_index, second_min_index, third_min_index, third_max_index, second_max_index, max_index]
+    
+    return indices
+
+def euclidean_distance(model_vector, infer_vector):
+    diffs = []
+
+    for i in range(len(model_vector)):
+        diff = (model_vector[i] - infer_vector[0][i])**2
+        diffs.append(diff)
+
+    return np.sqrt(sum(diffs))
+
+print('Loading params...')
+gamma_params_file = open('training_set_optimal_gammas.txt')
+gamma_params = np.loadtxt(gamma_params_file).reshape(29260, 20, 3)
+
+beta_params_file = open('training_set_optimal_betas.txt')
+beta_params = np.loadtxt(beta_params_file).reshape(29260, 20, 3)
+print('Completed')
+
+
+
+
+
+
+
 
 def parallel(ref):
     s = int(time.perf_counter() * ref[2])
@@ -305,7 +382,7 @@ class Refinement:
         self.done = False
         
     def refine_coarse(self):
-        self.solution, obj = self.mqlibSolve(20, G=self.G)
+        self.solution, obj = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         return self.obj
 
@@ -316,7 +393,7 @@ class Refinement:
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
     
-    def mqlibSolve(self, t=0.25, G=None):
+    def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
             n = self.G.numberOfNodes()
@@ -339,10 +416,28 @@ class Refinement:
         return (res['solution']+1)/2, res['objval']
 
     def qaoa(self, p=3, G=None):
+        global model_array
+        global gamma_params
+        global beta_params
+        s = time.perf_counter()
         n = G.numberOfNodes()
         G = nw.nxadapter.nk2nx(G)
         w = nx.adjacency_matrix(G)
-        problem = QuadraticProgram()
+
+        indices = []
+        infer_vector = model.infer([G])
+        euclidean_distances = []
+        for j in range(len(model_array)):
+            dist = euclidean_distance(model_array[j], infer_vector)
+            euclidean_distances.append(dist)
+        index = find_indices(euclidean_distances)
+        indices.append(index)
+        
+        gamma = gamma_params[indices[0][0]][0]
+        beta = beta_params[indices[0][0]][0]
+        initial_point = np.append(beta,gamma)
+
+        '''problem = QuadraticProgram()
         _ = [problem.binary_var(f"x{i}") for i in range(n)]
         linear = w.dot(np.ones(n))
         quadratic = -w
@@ -351,9 +446,15 @@ class Refinement:
         for _ in range(n-1):
             c.append(0)
         problem.linear_constraint(c, '==', 1)
-        cobyla = COBYLA()
+        cobyla = COBYLA()'''
+        O = max_cut.get_operator(w)
+        print(O)
         backend = BasicAer.get_backend('qasm_simulator')
-        qaoa = QAOA(optimizer=cobyla, reps=p, quantum_instance=backend)
+        qaoa = QAOA(optimizer=None, reps=3, quantum_instance=backend, initial_point = initial_point)
+        E = qaoa.construct_expectation(initial_point,O[0])
+        print(E)
+        res = qaoa.get_energy_evaluation(E[0])
+        print(res)
         algorithm=MinimumEigenOptimizer(qaoa)
         result = algorithm.solve(problem)
         L = result.x
@@ -362,6 +463,8 @@ class Refinement:
         for x in L:
             res[i] = x
             i += 1
+        t = time.perf_counter()
+        print(t-s, 'seconds solving qaoa')
         return res
 
     def buildGain(self):
@@ -431,82 +534,6 @@ class Refinement:
             return (subprob, mapProbToSubProb, idx)
 
 
-    def lockGainSubProb(self, spnodes=None):
-        if spnodes != None:
-            spsize = len(spnodes)
-        elif len(self.gainlist) >= self.spsize:
-            if self.randomness <= 0:
-                spnodes = self.gainlist[:self.spsize]
-            else:
-                if self.randomness >= 1:
-                    randomnodes = self.spsize
-                else:
-                    randomnodes = int(self.randomness * self.spsize)
-                spsize = self.spsize - randomnodes
-                spnodes = self.gainlist[:spsize]
-                used = set(spnodes)
-                c = 0
-                while c < randomnodes:
-                    k = random.randint(0, self.G.numberOfNodes()-1)
-                    if k not in used:
-                        spnodes.append(k)
-                        used.add(k)
-                        c += 1
-        else:
-            self.done = True
-            self.randomness += self.increase
-            spsize = self.spsize
-            spnodes = self.gainlist[:len(self.gainlist)]
-            used = set(spnodes)
-            while len(spnodes) < self.spsize:
-                k = random.randint(0, self.G.numberOfNodes()-1)
-                if k not in used:
-                    spnodes.append(k)
-                    used.add(k)
-
-        subprob = nw.graph.Graph(n=len(spnodes)+2, weighted = True, directed = False)
-        mapProbToSubProb = {}
-        ct =0
-        i = 0
-        idx =0
-        change = set()
-        while i < len(spnodes):
-            u = spnodes[i]
-            change.add(u)
-            if u in self.unused:
-                self.unused.remove(u)
-            mapProbToSubProb[u] = idx
-            idx += 1
-            i += 1
-        self.last_subprob = spnodes
-
-
-        keys = mapProbToSubProb.keys()
-        total = 0
-        j = 0
-        while j < len(spnodes):
-            u = spnodes[j]
-            if u in self.gainlist:
-                self.gainlist.remove(u)
-            spu = mapProbToSubProb[u]
-            for v in self.G.iterNeighbors(u):
-                w = self.G.weight(u,v)
-                if v not in keys:
-                    if self.solution[v] == 0:
-                        spv = idx
-                    else:
-                        spv = idx + 1
-                    subprob.increaseWeight(spu, spv, w)
-                else:
-                    spv = mapProbToSubProb[v]
-                    if u < v:
-                        subprob.increaseWeight(spu, spv, w)
-                total += w
-            j += 1
-
-        subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
-
-        return (subprob, mapProbToSubProb, idx)
 
 
     def refine(self):
@@ -546,7 +573,6 @@ class Refinement:
             
     def refineLevel(self):
         self.refine()
-        #print('global:', self.calc_obj(self.G, self.mqlibSolve(t=10, G=self.G)))
 
             
 
@@ -601,7 +627,7 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
-            if False:
+            if True:
                 sptime -= time.perf_counter()
                 R = Refinement(G, self.spsize, self.solver, self.solution)
                 R.refineLevel()
@@ -628,7 +654,6 @@ class MaxcutSolver:
         mqsol, _ = R.mqlibSolve(t=sptime,G=self.problem_graph)
         mqobj = R.calc_obj(self.problem_graph, mqsol)
         print('mqlib ratio:',self.obj / mqobj)
-        #print('coarse ratio:', self.coarse_obj/self.obj)
 
 
 s = time.perf_counter()
