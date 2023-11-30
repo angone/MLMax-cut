@@ -15,16 +15,18 @@ import MQLib as mq
 import multiprocessing
 import cProfile
 import resource
-#from qiskit_optimization import QuadraticProgram
-#from qiskit.algorithms.optimizers import COBYLA
 from qiskit import BasicAer
-from qiskit.algorithms import QAOA
-#from qiskit_optimization.algorithms import MinimumEigenOptimizer
 import pstats
 import math
 import warnings
 from karateclub.graph_embedding import Graph2Vec
-from qiskit.optimization.applications.ising import max_cut
+from qiskit.algorithms.optimizers import COBYLA
+from qiskit_optimization import QuadraticProgram
+from qiskit.algorithms import QAOA
+from qiskit_optimization.algorithms import MinimumEigenOptimizer
+from qiskit import IBMQ
+from qiskit_ibm_runtime import QiskitRuntimeService
+
 T = 0
 warnings.filterwarnings("ignore")
 
@@ -51,6 +53,11 @@ def matrices_to_graphs(matrix_list):
         g = nx.from_numpy_array(array)
         g_list.append(g)
     return g_list
+
+from qiskit_ibm_runtime import QiskitRuntimeService
+service = QiskitRuntimeService(channel='ibm_quantum', token='96f7894d14b636e4bd721c2ee67db561d23b29fb699a0d78a39049387969c3fcb6a60032f30b8d9ba726b70ef8e0c9bc4c1333d11dee0e8cb0202fffd42cf316')
+
+
 
 print('Loading model...')
 training_file = open("29260_40_node_random_graphs.txt")
@@ -111,10 +118,6 @@ gamma_params = np.loadtxt(gamma_params_file).reshape(29260, 20, 3)
 beta_params_file = open('training_set_optimal_betas.txt')
 beta_params = np.loadtxt(beta_params_file).reshape(29260, 20, 3)
 print('Completed')
-
-
-
-
 
 
 
@@ -419,11 +422,11 @@ class Refinement:
         global model_array
         global gamma_params
         global beta_params
+        global service
         s = time.perf_counter()
         n = G.numberOfNodes()
         G = nw.nxadapter.nk2nx(G)
         w = nx.adjacency_matrix(G)
-
         indices = []
         infer_vector = model.infer([G])
         euclidean_distances = []
@@ -435,9 +438,8 @@ class Refinement:
         
         gamma = gamma_params[indices[0][0]][0]
         beta = beta_params[indices[0][0]][0]
-        initial_point = np.append(beta,gamma)
-
-        '''problem = QuadraticProgram()
+        initial_point = [0,0,0,0,0,0]
+        problem = QuadraticProgram()
         _ = [problem.binary_var(f"x{i}") for i in range(n)]
         linear = w.dot(np.ones(n))
         quadratic = -w
@@ -446,15 +448,9 @@ class Refinement:
         for _ in range(n-1):
             c.append(0)
         problem.linear_constraint(c, '==', 1)
-        cobyla = COBYLA()'''
-        O = max_cut.get_operator(w)
-        print(O)
-        backend = BasicAer.get_backend('qasm_simulator')
+        cobyla = COBYLA()
+        backend = service.backend('ibmq_qasm_simulator') 
         qaoa = QAOA(optimizer=None, reps=3, quantum_instance=backend, initial_point = initial_point)
-        E = qaoa.construct_expectation(initial_point,O[0])
-        print(E)
-        res = qaoa.get_energy_evaluation(E[0])
-        print(res)
         algorithm=MinimumEigenOptimizer(qaoa)
         result = algorithm.solve(problem)
         L = result.x
