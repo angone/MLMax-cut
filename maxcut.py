@@ -34,6 +34,7 @@ random.seed(int(time.perf_counter()))
 np.random.seed(int(time.perf_counter()))
 faulthandler.enable()
 
+#parse command line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-g", type = str, default = "None", help = "graph file")
 parser.add_argument("-sp", type = int, default = 18, help = "size of subproblems")
@@ -46,6 +47,7 @@ args = parser.parse_args()
 sptime = 0
 flag = True
 
+#Convert a list of adjacency matrices to a list of networkx graphs
 def matrices_to_graphs(matrix_list):
     g_list = []
     for matrix in matrix_list:
@@ -54,23 +56,21 @@ def matrices_to_graphs(matrix_list):
         g_list.append(g)
     return g_list
 
-from qiskit_ibm_runtime import QiskitRuntimeService
-service = QiskitRuntimeService(channel='ibm_quantum', token='96f7894d14b636e4bd721c2ee67db561d23b29fb699a0d78a39049387969c3fcb6a60032f30b8d9ba726b70ef8e0c9bc4c1333d11dee0e8cb0202fffd42cf316')
-
-
-
+#Load the model for parameter transfer
 print('Loading model...')
 training_file = open("29260_40_node_random_graphs.txt")
 training_matrix_list = np.loadtxt(training_file).reshape(29260,40,40)
 training_graph_list = matrices_to_graphs(training_matrix_list)
 print('Completed')
+
+#Fit the model for parameter transfer
 print('Fitting model...')
 model = Graph2Vec(epochs=100, learning_rate=0.065)
 model.fit(training_graph_list)
 model_array = model.get_embedding()
 print('Completed')
 
-
+#get indices of 3 max and 3 min values
 def find_indices(vector):
     length = len(vector)
     sorted_vector = sorted(vector)
@@ -102,6 +102,7 @@ def find_indices(vector):
     
     return indices
 
+#compute distance between two vectors for parameter transfer
 def euclidean_distance(model_vector, infer_vector):
     diffs = []
 
@@ -111,6 +112,7 @@ def euclidean_distance(model_vector, infer_vector):
 
     return np.sqrt(sum(diffs))
 
+#load parameters for parameter transfer
 print('Loading params...')
 gamma_params_file = open('training_set_optimal_gammas.txt')
 gamma_params = np.loadtxt(gamma_params_file).reshape(29260, 20, 3)
@@ -121,7 +123,7 @@ print('Completed')
 
 
 
-
+#run refinement in parallel
 def parallel(ref):
     s = int(time.perf_counter() * ref[2])
     random.seed(s)
@@ -130,7 +132,11 @@ def parallel(ref):
     R.refineLevel()
     return R.solution, R.obj
 
+#class used for the coarsening
 class EmbeddingCoarsening:
+    #G: graph to sparsify
+    #d: dimension of the embedding
+    #ratio: ratio of edges to sparsify
     def __init__(self, G, d, shape, ratio):
         self.G = G
         self.sG = nw.graphtools.toWeighted(G)
@@ -142,10 +148,15 @@ class EmbeddingCoarsening:
         self.R = -1
         self.ratio = ratio
 
+    #sparsify graph
     def sparsify(self):
+        #return if no edges should be sparsified
         if self.ratio == 0:
             return
+        #compute number of edges to remove
         removeCount = int(self.ratio * self.sG.numberOfEdges())
+
+        #compute length of each edge in embedding
         edgeDist = []
         edgeMap = {}
         for u,v in self.sG.iterEdges():
@@ -157,10 +168,17 @@ class EmbeddingCoarsening:
             edgeDist.append((d, u, v))
             edgeMap[(u,v)] = d
             edgeMap[(v,u)] = d
+            
+        #sort edges by their distance
         edgeDist.sort()
+
+        #remove shortest edges
         for i in range(removeCount):
+            #get endpoints of edge to remove
             u = edgeDist[i][1]
             v = edgeDist[i][2]
+            
+            #find minimum weight adjacent edge
             minE_u = None
             minE_v = None
             for x in self.sG.iterNeighbors(u):
@@ -171,6 +189,8 @@ class EmbeddingCoarsening:
                 if u != x:
                     if minE_v == None or edgeMap[(v,x)] < edgeMap[minE_v]:
                         minE_v = (v, x)
+
+            #reweight edges to preserve weights
             w = self.sG.weight(u,v)
             if minE_u != None and (minE_v == None or edgeMap[minE_u] < edgeMap[minE_v]):
                 u1 = minE_u[0]
@@ -185,7 +205,7 @@ class EmbeddingCoarsening:
             self.sG.removeEdge(u, v)
 
         
-
+    #compute distance objective for a node in the embedding
     def nodeObj(self, p, c):
         obj = 0
         for x in c:
@@ -193,6 +213,7 @@ class EmbeddingCoarsening:
                 obj += x[self.d]*(p[i]-x[i])**2
         return obj
 
+    #get a random point within the embedding
     def randPoint(self):
         theta = random.uniform(0,2*math.pi)
         phi = random.uniform(0,math.pi)
@@ -201,6 +222,7 @@ class EmbeddingCoarsening:
         z = math.cos(phi)
         return [x, y, z]    
 
+    #compute the optimal position of a node in the embedding
     def optimal(self, u):
         k = 2*self.sG.weightedDegree(u)
         a = 1
@@ -250,6 +272,7 @@ class EmbeddingCoarsening:
                 d += (p2[i] - X[i])**2
             return p2, np.sqrt(d)
 
+    #evaluate the objective of optimizing the embedding
     def coarseObj(self):
         o = 0
         for u, v, w in self.sG.iterEdgesWeights():
@@ -257,6 +280,7 @@ class EmbeddingCoarsening:
                 o += w * (self.space[u][i] - self.space[v][i])**2
         print('Current Obj (to be minimized):',o)
 
+    #iterate through nodes and optimize the location in embedding to maximize distance between neighbors
     def embed(self, nodes):
         n = self.sG.numberOfNodes()
         change = 0
@@ -265,7 +289,8 @@ class EmbeddingCoarsening:
             self.space[i] = res
             change += c
         return change/n
-    
+
+    #match each vertex with the nearest neighbor in the embedding greedily
     def match(self):
         n = self.sG.numberOfNodes()
         tree = KDTree(self.space)
@@ -330,6 +355,7 @@ class EmbeddingCoarsening:
         for i in range(int(m/2)):
             self.M.add((unused[2*i], unused[2*i + 1]))
 
+    #construct coarse graph from a matching of nodes
     def coarsen(self):
         n = self.sG.numberOfNodes()
         i = 0
@@ -363,7 +389,8 @@ class EmbeddingCoarsening:
             self.cG.increaseWeight(cu, cv, self.G.weight(u, v))
         self.cG.removeSelfLoops()
         self.cG.indexEdges()
-    
+
+#class to refine a level of the graph
 class Refinement:
     def __init__(self, G, spsize, solver, solution):
         self.G = G
@@ -383,19 +410,22 @@ class Refinement:
         self.bound = 3
         self.increase = -1
         self.done = False
-        
+
+    #refines the coarsest level with MQLib
     def refine_coarse(self):
         self.solution, obj = self.mqlibSolve(5, G=self.G)
         self.obj = self.calc_obj(self.G, self.solution)
         return self.obj
 
+    #compute the maxcut objective at this level
     def calc_obj(self, G, solution):
         obj = 0
         n = G.numberOfNodes()
         for u, v in G.iterEdges():
             obj += G.weight(u, v)*(2*solution[u]*solution[v] - solution[u] - solution[v])
         return -1 * obj
-    
+
+    #solve a maxcut instance using MQLib for a set running time
     def mqlibSolve(self, t=0.1, G=None):
         if G == None:
             G = self.G
@@ -418,6 +448,7 @@ class Refinement:
 
         return (res['solution']+1)/2, res['objval']
 
+    #solve a maxcut instance using qaoa
     def qaoa(self, p=3, G=None):
         global model_array
         global gamma_params
@@ -449,7 +480,7 @@ class Refinement:
             c.append(0)
         problem.linear_constraint(c, '==', 1)
         cobyla = COBYLA()
-        backend = service.backend('ibmq_qasm_simulator') 
+        backend = service.backend('qasm_simulator') 
         qaoa = QAOA(optimizer=None, reps=3, quantum_instance=backend, initial_point = initial_point)
         algorithm=MinimumEigenOptimizer(qaoa)
         result = algorithm.solve(problem)
@@ -462,7 +493,8 @@ class Refinement:
         t = time.perf_counter()
         print(t-s, 'seconds solving qaoa')
         return res
-
+    
+    #compute the gain for each node
     def buildGain(self):
         for u,v,w in self.G.iterEdgesWeights():
             if self.solution[u] == self.solution[v]:
@@ -472,7 +504,8 @@ class Refinement:
                 self.gainmap[u] -= w
                 self.gainmap[v] -= w
         self.gainlist = SortedKeyList([i for i in range(self.n)], key=lambda x: self.gainmap[x]+0.01*x)
-           
+
+    #update the gain after changing the solution
     def updateGain(self, S, changed):
         for u in changed:
             for v in self.G.iterNeighbors(u):
@@ -482,7 +515,7 @@ class Refinement:
                         self.gainmap[v] += w
                     else:
                         self.gainmap[v] -= w       
-         
+    #construct a subproblem using a random subset and choosing by highest gain   
     def randGainSubProb(self):
             if self.n >= 2*self.spsize:
                 sample_size = max(int(0.2*self.n), 2*self.spsize)
@@ -529,9 +562,7 @@ class Refinement:
             subprob.increaseWeight(idx, idx+1, self.G.totalEdgeWeight() - total)
             return (subprob, mapProbToSubProb, idx)
 
-
-
-
+    #refine the current level
     def refine(self):
         count = 0
         while count < 3:
@@ -572,7 +603,7 @@ class Refinement:
 
             
 
-
+#class used to solve the maxcut problem
 class MaxcutSolver:
     def __init__(self, fname, sp, solver, ratio):
         self.problem_graph = nw.readGraph("./graphs/"+fname, nw.Format.EdgeListSpaceOne)
@@ -584,21 +615,24 @@ class MaxcutSolver:
         self.obj = 0
         self.start = time.perf_counter()
         self.ratio = ratio
-    
+
+    #randomly perturb a solution
     def noisySolution(self, ratio):
         S = self.solution.copy()
         for i in range(int(len(S)*ratio)):
             k = random.randint(0, len(S)-1)
             S[k] = 1 - S[k]
         return S
-    
+
+    #solves the maxcut problem using multilevel methods
     def solve(self):
         global sptime
         G = nw.graphtools.toWeighted(self.problem_graph)
         print(G)
         s = time.perf_counter()
+        #coarsen the graph down to subproblem size
         while G.numberOfNodes() > self.spsize:
-            E = EmbeddingCoarsening(G, 3,'cube', self.ratio)
+            E = EmbeddingCoarsening(G, 3,'sphere', self.ratio)
             E.coarsen()
             print(E.cG)
             self.hierarchy.append(E)
@@ -606,10 +640,14 @@ class MaxcutSolver:
         t = time.perf_counter()
         print(t-s, 'sec coarsening')
         self.hierarchy.reverse()
+
+        #refine the coarsest level
         R = Refinement(G, self.spsize, 'mqlib', [random.randint(0, 1) for _ in range(G.numberOfNodes())])
         self.coarse_obj = R.refine_coarse()
         self.obj = R.obj
         self.solution = R.solution
+
+        #iterate through and refine every other level
         starts = 40
         for i in range(len(self.hierarchy)):
             E = self.hierarchy[i]
@@ -623,6 +661,7 @@ class MaxcutSolver:
             for j in range(len(S)):
                 S[j] = self.solution[fineToCoarse[j]]
             self.solution = S
+            #refine without multistart
             if True:
                 sptime -= time.perf_counter()
                 R = Refinement(G, self.spsize, self.solver, self.solution)
@@ -630,6 +669,7 @@ class MaxcutSolver:
                 sptime += time.perf_counter()
                 self.solution = R.solution
                 self.obj = R.obj
+            #refine with multistart
             else:
                 inputs = [(G, self.solution.copy(), j, self.solver) for j in range(starts)]
                 max_obj = self.obj
@@ -651,7 +691,7 @@ class MaxcutSolver:
         mqobj = R.calc_obj(self.problem_graph, mqsol)
         print('mqlib ratio:',self.obj / mqobj)
 
-
+#call maxcut class to compute the solution
 s = time.perf_counter()
 M = MaxcutSolver(fname=args.g, sp=args.sp, solver=args.S, ratio = args.sparse)
 M.solve()
